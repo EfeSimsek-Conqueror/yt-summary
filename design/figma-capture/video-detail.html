@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Video detail — Segments (Figma capture)</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+  </head>
+  <body>
+    <!-- Frame: Video selected — segment analysis + transcript -->
+    <div class="artboard" data-frame="VideoDetail">
+      <div class="frame-label">Frame · Video detail · Segments</div>
+      <header class="topnav" aria-label="Top navigation">
+        <div class="logo">
+          <div class="logo-mark" aria-hidden="true"></div>
+          <span>TubeSummary</span>
+        </div>
+        <div class="topnav-right">
+          <div class="avatar" title="Profile"></div>
+        </div>
+      </header>
+      <div class="shell">
+        <aside class="sidebar" aria-label="Subscriptions">
+          <div class="sidebar-title">Subscriptions</div>
+          <div class="sub-item active">
+            <div class="sub-avatar"></div>
+            <div class="sub-meta">
+              <div class="sub-name">Fireship</div>
+            </div>
+          </div>
+          <div class="sub-item">
+            <div class="sub-avatar"></div>
+            <div class="sub-meta">
+              <div class="sub-name">The Primeagen</div>
+            </div>
+          </div>
+          <div class="sub-item">
+            <div class="sub-avatar"></div>
+            <div class="sub-meta">
+              <div class="sub-name">Google for Developers</div>
+            </div>
+          </div>
+        </aside>
+        <main class="main">
+          <div class="detail-layout">
+            <div class="detail-left">
+              <div class="hero-thumb" aria-hidden="true"></div>
+              <h2>100 JavaScript concepts you need to know</h2>
+              <p class="meta">Fireship · 8:42 · Analysis model: placeholder</p>
+              <div class="transcript-block">
+                <h3>Full transcript</h3>
+                <div class="transcript-lines">
+                  Welcome back to the channel. Today we are blasting through one hundred JavaScript concepts
+                  you should know. We will cover primitives, coercion, closures, prototypes, async patterns,
+                  and the event loop. Grab a coffee—this will move fast. First up: let versus const versus
+                  var, and why block scope matters in modern codebases...
+                </div>
+              </div>
+            </div>
+            <div class="segment-panel" aria-label="Segment analysis">
+              <h3>Segments (max 10)</h3>
+              <div class="segment-row">
+                <div class="segment-time">00:00 – 05:00</div>
+                <ul>
+                  <li>Intro and roadmap for the 100 concepts format.</li>
+                  <li>Primitives, typeof quirks, and BigInt note.</li>
+                </ul>
+              </div>
+              <div class="segment-row">
+                <div class="segment-time">05:00 – 15:00</div>
+                <ul>
+                  <li>Scope: function vs block; TDZ for let/const.</li>
+                  <li>Closures with a tiny counter example.</li>
+                </ul>
+              </div>
+              <div class="segment-row">
+                <div class="segment-time">15:00 – 30:00</div>
+                <ul>
+                  <li>this binding rules; arrow functions vs regular.</li>
+                  <li>Prototypes, classes as sugar, extends behavior.</li>
+                </ul>
+              </div>
+              <div class="segment-row">
+                <div class="segment-time">30:00 – 45:00</div>
+                <ul>
+                  <li>Promises, async/await, error handling patterns.</li>
+                  <li>Event loop: microtasks vs macrotasks.</li>
+                </ul>
+              </div>
+              <p class="empty-hint">Component: SegmentRow</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard — YouTube Summary (Figma capture)</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+  </head>
+  <body>
+    <!-- Frame: Dashboard 1440 — channel list + video grid -->
+    <div class="artboard" data-frame="Dashboard">
+      <div class="frame-label">Frame · Dashboard · 1440</div>
+      <header class="topnav" aria-label="Top navigation">
+        <div class="logo">
+          <div class="logo-mark" aria-hidden="true"></div>
+          <span>TubeSummary</span>
+        </div>
+        <div class="topnav-right">
+          <div class="avatar" title="Profile"></div>
+        </div>
+      </header>
+      <div class="shell">
+        <aside class="sidebar" aria-label="Subscriptions">
+          <div class="sidebar-title">Subscriptions</div>
+          <div class="sub-item active">
+            <div class="sub-avatar"></div>
+            <div class="sub-meta">
+              <div class="sub-name">Fireship</div>
+            </div>
+          </div>
+          <div class="sub-item">
+            <div class="sub-avatar"></div>
+            <div class="sub-meta">
+              <div class="sub-name">The Primeagen</div>
+            </div>
+          </div>
+          <div class="sub-item">
+            <div class="sub-avatar"></div>
+            <div class="sub-meta">
+              <div class="sub-name">Google for Developers</div>
+            </div>
+          </div>
+          <div class="sub-item">
+            <div class="sub-avatar"></div>
+            <div class="sub-meta">
+              <div class="sub-name">Syntax</div>
+            </div>
+          </div>
+          <div class="sub-item">
+            <div class="sub-avatar"></div>
+            <div class="sub-meta">
+              <div class="sub-name">Vercel</div>
+            </div>
+          </div>
+          <p class="empty-hint">Component: SubscriptionItem</p>
+        </aside>
+        <main class="main">
+          <div class="channel-header">
+            <h1>Fireship</h1>
+            <p>Latest uploads · synced from YouTube</p>
+          </div>
+          <div class="video-grid" aria-label="Video grid">
+            <article class="video-card">
+              <div class="video-thumb">
+                <span class="video-duration">8:42</span>
+              </div>
+              <div class="video-body">
+                <h2 class="video-title">100 JavaScript concepts you need to know</h2>
+                <p class="video-summary">
+                  Fast tour of core JS ideas from closures to event loop—good refresher before interviews.
+                </p>
+              </div>
+            </article>
+            <article class="video-card">
+              <div class="video-thumb">
+                <span class="video-duration">12:05</span>
+              </div>
+              <div class="video-body">
+                <h2 class="video-title">How I would learn to code in 2025</h2>
+                <p class="video-summary">
+                  Suggests a practical stack, projects-first path, and avoiding tutorial overload.
+                </p>
+              </div>
+            </article>
+            <article class="video-card">
+              <div class="video-thumb">
+                <span class="video-duration">6:18</span>
+              </div>
+              <div class="video-body">
+                <h2 class="video-title">The problem with Next.js</h2>
+                <p class="video-summary">
+                  Tradeoffs of the App Router, caching surprises, and when simpler tools win.
+                </p>
+              </div>
+            </article>
+            <article class="video-card">
+              <div class="video-thumb">
+                <span class="video-duration">15:22</span>
+              </div>
+              <div class="video-body">
+                <h2 class="video-title">Postgres in 100 seconds</h2>
+                <p class="video-summary">
+                  CRUD, indexes, and why relational beats NoSQL for many app backends.
+                </p>
+              </div>
+            </article>
+            <article class="video-card">
+              <div class="video-thumb">
+                <span class="video-duration">9:01</span>
+              </div>
+              <div class="video-body">
+                <h2 class="video-title">Docker in 100 seconds</h2>
+                <p class="video-summary">
+                  Images vs containers, Dockerfile basics, and compose for local dev stacks.
+                </p>
+              </div>
+            </article>
+            <article class="video-card">
+              <div class="video-thumb">
+                <span class="video-duration">4:55</span>
+              </div>
+              <div class="video-body">
+                <h2 class="video-title">Git in 100 seconds</h2>
+                <p class="video-summary">
+                  Staging, commits, branches, merge vs rebase—minimum viable Git mental model.
+                </p>
+              </div>
+            </article>
+          </div>
+          <p class="empty-hint" style="margin-top: 16px">
+            Components: TopNav · VideoCard · EmptyState (not shown) · LoadingSkeleton (not shown)
+          </p>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>
