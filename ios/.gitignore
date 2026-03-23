@@ -1,4 +1,5 @@
-# Local Supabase keys (copy from Secrets.example.xcconfig)
+# Local Supabase keys — copy from AppSecrets.swift.example
+VidSum/AppSecrets.swift
 Secrets.xcconfig
 **/xcuserdata/
 *.xcworkspace/xcuserdata/

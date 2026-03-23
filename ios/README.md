@@ -10,7 +10,8 @@ Native **Swift / SwiftUI** client for the same Supabase + Google + YouTube Data 
 ## Setup
 
 1. **Secrets**  
-   Edit `VidSum/AppSecrets.swift` and set `supabaseURL` + `supabaseAnonKey` (same values as `web/.env.local`: `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`).
+   Copy `VidSum/AppSecrets.swift.example` → `VidSum/AppSecrets.swift` and paste your `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` from `web/.env.local`.  
+   `AppSecrets.swift` is gitignored so keys are not committed.
 
 2. **Generate the Xcode project**
 
