@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct VidSumApp: App {
+  @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
   @StateObject private var appModel = AppViewModel()
 
   var body: some Scene {
@@ -9,12 +10,7 @@ struct VidSumApp: App {
       ContentView()
         .environmentObject(appModel)
         .onOpenURL { url in
-          if OAuthCallbackBridge.receiveCallback(url) {
-            // Completes `openAuthAndWait` — session is finished in `signInWithGoogle`
-            return
-          }
-          SupabaseManager.client.auth.handle(url)
-          Task { await appModel.refreshSession() }
+          Task { await OAuthCallbackBridge.processIncomingOAuthURL(url) }
         }
     }
   }

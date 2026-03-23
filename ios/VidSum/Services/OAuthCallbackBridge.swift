@@ -6,6 +6,24 @@ import UIKit
 @MainActor
 enum OAuthCallbackBridge {
   private static var pending: CheckedContinuation<URL, Error>?
+  /// Suppress duplicate delivery when both `AppDelegate` and SwiftUI deliver the same URL.
+  private static var lastDedupKey: String?
+  private static var lastDedupAt: Date?
+
+  /// Single entry for AppDelegate + SwiftUI: resume Safari wait or let Supabase parse the callback.
+  static func processIncomingOAuthURL(_ url: URL) async {
+    if url.scheme?.lowercased() == "vidsum" {
+      let key = url.absoluteString
+      if let prev = lastDedupKey, prev == key, let t = lastDedupAt, Date().timeIntervalSince(t) < 1.5 {
+        return
+      }
+      lastDedupKey = key
+      lastDedupAt = Date()
+    }
+
+    if receiveCallback(url) { return }
+    SupabaseManager.client.auth.handle(url)
+  }
 
   /// Call from `onOpenURL` when `vidsum://auth-callback?...` arrives.
   /// Returns `true` if this URL completed a pending OAuth wait.

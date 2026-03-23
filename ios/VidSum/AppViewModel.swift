@@ -34,7 +34,7 @@ final class AppViewModel: ObservableObject {
     }
   }
 
-  /// Uses Safari + `vidsum://` callback (see `OAuthCallbackBridge`) instead of `ASWebAuthenticationSession`.
+  /// Safari + `vidsum://` via `OAuthCallbackBridge` (same flow as `signInWithOAuth` + custom `launchFlow`).
   func signInWithGoogle() async {
     isSigningIn = true
     errorMessage = nil
@@ -48,18 +48,17 @@ final class AppViewModel: ObservableObject {
         "https://www.googleapis.com/auth/userinfo.profile",
       ].joined(separator: " ")
 
-      let authURL = try client.auth.getOAuthSignInURL(
+      _ = try await client.auth.signInWithOAuth(
         provider: .google,
-        scopes: scopes,
         redirectTo: redirect,
+        scopes: scopes,
         queryParams: [
           ("access_type", "offline"),
           ("prompt", "consent"),
         ]
-      )
-
-      let resultURL = try await OAuthCallbackBridge.openAuthAndWait(authURL: authURL)
-      _ = try await client.auth.session(from: resultURL)
+      ) { authURL in
+        try await OAuthCallbackBridge.openAuthAndWait(authURL: authURL)
+      }
       await refreshSession()
     } catch {
       if error is CancellationError { return }
