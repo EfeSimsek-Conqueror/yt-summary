@@ -42,6 +42,10 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>SUPABASE_URL</key>
+	<string>https://rrkdbtuppxjhagpgefax.supabase.co</string>
+	<key>SUPABASE_ANON_KEY</key>
+	<string>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJya2RidHVwcHhqaGFncGdlZmF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMTM0NTQsImV4cCI6MjA4OTc4OTQ1NH0.Ynmnbt0vYt_0cMVr9dT763lxpt3dQlQCD8BhEVSgZks</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

@@ -1,6 +1,7 @@
 import Foundation
 
-/// Supabase — same project as `web/.env.local` (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`).
+/// Fallback if `Info.plist` keys `SUPABASE_URL` / `SUPABASE_ANON_KEY` are missing.
+/// Primary config is in **Info.plist** so Google OAuth uses the correct host on device.
 enum AppSecrets {
   static let supabaseURL = URL(string: "https://rrkdbtuppxjhagpgefax.supabase.co")!
   static let supabaseAnonKey =
