@@ -47,6 +47,24 @@ The repo includes a minimal **AppIcon** (1024×1024) so Xcode validates the asse
 
 ## Sorun giderme
 
+### Assets içinde yalnızca `AccentColor` görünüyor, `AppIcon` yok / “matching … app icon set”
+
+Repo güncel değil veya yanlış klasör açılmış olabilir.
+
+1. Terminal:
+
+   ```bash
+   cd /path/to/yt-summary   # veya youtube-summary-fullstack
+   git pull origin main
+   ls VidSum/Resources/Assets.xcassets/AppIcon.appiconset
+   ```
+
+   Çıktıda **`AppIcon.png`** ve **`Contents.json`** görünmeli. Yoksa pull çalışmadı veya bu repo değil.
+
+2. Xcode’u kapatıp `ios/VidSum.xcodeproj`’ü tekrar açın; solda **Assets** → `AppIcon` satırı görünmeli.
+
+3. Hâlâ yoksa: **File → Packages → Reset Package Caches** (SPM) ve **Product → Clean Build Folder** (⇧⌘K).
+
 ### “Build input file cannot be found: …/AppSecrets.swift”
 
 Xcode **yalnızca** `ios/VidSum/AppSecrets.swift` dosyasını derler; adı **`AppSecrets.swift.example` olan dosya aynı şey değildir**.
