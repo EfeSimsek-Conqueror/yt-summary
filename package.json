@@ -1,0 +1,11 @@
+{
+  "name": "yt-summary",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm ci --prefix web && npm run build --prefix web",
+    "start": "npm run start --prefix web"
+  }
+}
