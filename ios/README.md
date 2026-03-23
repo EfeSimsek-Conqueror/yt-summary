@@ -43,7 +43,7 @@ Native **Swift / SwiftUI** client for the same Supabase + Google + YouTube Data 
 
 ## App icon
 
-Add an **App Icon** set in `Assets.xcassets` when you prepare a TestFlight / App Store build.
+The repo includes a minimal **AppIcon** (1024×1024) so Xcode validates the asset catalog. Replace it in `Assets.xcassets/AppIcon` before App Store submission if you want a branded icon.
 
 ## Sorun giderme
 
