@@ -6,6 +6,13 @@ struct HomeView: View {
   @State private var channels: [YTChannel] = []
   @State private var isLoadingChannels = false
   @State private var loadError: String?
+  @State private var searchText = ""
+
+  private var filteredChannels: [YTChannel] {
+    let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    if q.isEmpty { return channels }
+    return channels.filter { $0.title.localizedCaseInsensitiveContains(q) }
+  }
 
   var body: some View {
     NavigationStack {
@@ -20,14 +27,18 @@ struct HomeView: View {
             description: Text(loadError)
           )
         } else {
-          List(channels) { ch in
-            NavigationLink(value: ch) {
-              ChannelRow(channel: ch)
+          VStack(spacing: 0) {
+            subsSearchBar
+            List(filteredChannels) { ch in
+              NavigationLink(value: ch) {
+                ChannelRow(channel: ch)
+              }
             }
+            .listStyle(.plain)
           }
         }
       }
-      .navigationTitle("Subscriptions")
+      .navigationTitle("Abonelikler")
       .navigationDestination(for: YTChannel.self) { ch in
         VideoListView(channel: ch, accessToken: appModel.session?.providerToken)
       }
@@ -37,11 +48,28 @@ struct HomeView: View {
     }
     .toolbar {
       ToolbarItem(placement: .topBarTrailing) {
-        Button("Sign out") {
+        Button("Çıkış") {
           Task { await appModel.signOut() }
         }
       }
     }
+  }
+
+  private var subsSearchBar: some View {
+    HStack(spacing: 10) {
+      Image(systemName: "magnifyingglass")
+        .foregroundStyle(.secondary)
+      TextField("Kanallarda ara", text: $searchText)
+        .textInputAutocapitalization(.never)
+        .autocorrectionDisabled()
+    }
+    .padding(12)
+    .background(
+      RoundedRectangle(cornerRadius: 14, style: .continuous)
+        .fill(Color(.secondarySystemGroupedBackground))
+    )
+    .padding(.horizontal, 16)
+    .padding(.vertical, 10)
   }
 
   private func loadChannels() async {

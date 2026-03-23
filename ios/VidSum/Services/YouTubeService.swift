@@ -126,6 +126,7 @@ enum YouTubeService {
         let title = item.snippet?.title ?? sn?.title ?? "Untitled"
         let desc = item.snippet?.description ?? sn?.description ?? ""
         let durationIso = item.contentDetails?.duration ?? "PT0S"
+        let durationSec = ISO8601Duration.parseSeconds(durationIso) ?? 0
         let summary =
           desc.trimmingCharacters(in: .whitespacesAndNewlines).prefix(160)
         let summaryStr =
@@ -139,6 +140,7 @@ enum YouTubeService {
             channelId: channelId,
             title: title,
             durationLabel: ISO8601Duration.formatLabel(durationIso),
+            durationSeconds: durationSec,
             summaryShort: summaryStr,
             thumbnailURL: sn?.thumb
           )

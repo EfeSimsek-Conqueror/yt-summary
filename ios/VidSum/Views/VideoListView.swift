@@ -7,29 +7,40 @@ struct VideoListView: View {
   @State private var videos: [YTVideo] = []
   @State private var isLoading = false
   @State private var errorMessage: String?
+  @State private var searchText = ""
+
+  private var filteredVideos: [YTVideo] {
+    let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    if q.isEmpty { return videos }
+    return videos.filter { $0.title.localizedCaseInsensitiveContains(q) }
+  }
 
   var body: some View {
     Group {
       if isLoading && videos.isEmpty {
-        ProgressView("Loading videos…")
+        ProgressView("Videolar yükleniyor…")
           .frame(maxWidth: .infinity, maxHeight: .infinity)
       } else if let errorMessage {
         ContentUnavailableView(
-          "Couldn’t load videos",
+          "Videolar yüklenemedi",
           systemImage: "exclamationmark.triangle",
           description: Text(errorMessage)
         )
       } else if videos.isEmpty {
         ContentUnavailableView(
-          "No uploads",
+          "Video yok",
           systemImage: "film",
-          description: Text("This channel has no recent uploads in the feed.")
+          description: Text("Bu kanalda son yüklemelerde video görünmüyor.")
         )
       } else {
-        List(videos) { video in
-          NavigationLink(destination: VideoDetailView(video: video)) {
-            VideoRow(video: video)
+        VStack(spacing: 0) {
+          videoSearchBar
+          List(filteredVideos) { video in
+            NavigationLink(destination: VideoDetailView(video: video)) {
+              VideoRow(video: video)
+            }
           }
+          .listStyle(.plain)
         }
       }
     }
@@ -38,6 +49,23 @@ struct VideoListView: View {
     .task(id: channel.id) {
       await loadVideos()
     }
+  }
+
+  private var videoSearchBar: some View {
+    HStack(spacing: 10) {
+      Image(systemName: "magnifyingglass")
+        .foregroundStyle(.secondary)
+      TextField("Videolarda ara", text: $searchText)
+        .textInputAutocapitalization(.never)
+        .autocorrectionDisabled()
+    }
+    .padding(12)
+    .background(
+      RoundedRectangle(cornerRadius: 14, style: .continuous)
+        .fill(Color(.secondarySystemGroupedBackground))
+    )
+    .padding(.horizontal, 16)
+    .padding(.vertical, 10)
   }
 
   private func loadVideos() async {
