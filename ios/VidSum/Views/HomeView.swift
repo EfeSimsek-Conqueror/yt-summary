@@ -27,18 +27,16 @@ struct HomeView: View {
             description: Text(loadError)
           )
         } else {
-          VStack(spacing: 0) {
-            subsSearchBar
-            List(filteredChannels) { ch in
-              NavigationLink(value: ch) {
-                ChannelRow(channel: ch)
-              }
+          List(filteredChannels) { ch in
+            NavigationLink(value: ch) {
+              ChannelRow(channel: ch)
             }
-            .listStyle(.plain)
           }
+          .listStyle(.plain)
         }
       }
       .navigationTitle("Abonelikler")
+      .searchable(text: $searchText, prompt: "Kanallarda ara")
       .navigationDestination(for: YTChannel.self) { ch in
         VideoListView(channel: ch, accessToken: appModel.session?.providerToken)
       }
@@ -53,23 +51,6 @@ struct HomeView: View {
         }
       }
     }
-  }
-
-  private var subsSearchBar: some View {
-    HStack(spacing: 10) {
-      Image(systemName: "magnifyingglass")
-        .foregroundStyle(.secondary)
-      TextField("Kanallarda ara", text: $searchText)
-        .textInputAutocapitalization(.never)
-        .autocorrectionDisabled()
-    }
-    .padding(12)
-    .background(
-      RoundedRectangle(cornerRadius: 14, style: .continuous)
-        .fill(Color(.secondarySystemGroupedBackground))
-    )
-    .padding(.horizontal, 16)
-    .padding(.vertical, 10)
   }
 
   private func loadChannels() async {

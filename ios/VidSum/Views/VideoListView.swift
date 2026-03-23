@@ -33,39 +33,20 @@ struct VideoListView: View {
           description: Text("Bu kanalda son yüklemelerde video görünmüyor.")
         )
       } else {
-        VStack(spacing: 0) {
-          videoSearchBar
-          List(filteredVideos) { video in
-            NavigationLink(destination: VideoDetailView(video: video)) {
-              VideoRow(video: video)
-            }
+        List(filteredVideos) { video in
+          NavigationLink(destination: VideoDetailView(video: video)) {
+            VideoRow(video: video)
           }
-          .listStyle(.plain)
         }
+        .listStyle(.plain)
       }
     }
     .navigationTitle(channel.title)
     .navigationBarTitleDisplayMode(.inline)
+    .searchable(text: $searchText, prompt: "Videolarda ara")
     .task(id: channel.id) {
       await loadVideos()
     }
-  }
-
-  private var videoSearchBar: some View {
-    HStack(spacing: 10) {
-      Image(systemName: "magnifyingglass")
-        .foregroundStyle(.secondary)
-      TextField("Videolarda ara", text: $searchText)
-        .textInputAutocapitalization(.never)
-        .autocorrectionDisabled()
-    }
-    .padding(12)
-    .background(
-      RoundedRectangle(cornerRadius: 14, style: .continuous)
-        .fill(Color(.secondarySystemGroupedBackground))
-    )
-    .padding(.horizontal, 16)
-    .padding(.vertical, 10)
   }
 
   private func loadVideos() async {
