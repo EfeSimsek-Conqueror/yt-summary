@@ -4,6 +4,7 @@ import { VideoSearchBar } from "@/components/video-search-bar";
 import { YoutubeSyncHint } from "@/components/youtube-sync-hint";
 import { getChannelsForUser } from "@/lib/channels-for-user";
 import { getChannel } from "@/lib/mock-data";
+import { createClient } from "@/lib/supabase/server";
 import {
   getVideosForHome,
   getVideosFromYoutubeSearch,
@@ -18,6 +19,12 @@ export default async function Home({ searchParams }: Props) {
   const searchQuery =
     typeof qParam === "string" ? qParam.trim() : "";
   const isSearch = searchQuery.length > 0;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const {
     channels,
     source,
@@ -53,6 +60,7 @@ export default async function Home({ searchParams }: Props) {
       channels={channels}
       activeChannelId={resolvedId}
       suppressSidebarActive={isSearch}
+      isAuthenticated={!!user}
     >
       <main className="p-6 px-7 lg:p-7">
         <YoutubeSyncHint

@@ -13,12 +13,20 @@ type Props = {
 
 export default async function VideoPage({ params }: Props) {
   const { id } = await params;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const { channels } = await getChannelsForUser();
 
   const mock = getVideo(id);
   if (mock) {
     return (
-      <AppShell channels={channels} activeChannelId={mock.channelId}>
+      <AppShell
+        channels={channels}
+        activeChannelId={mock.channelId}
+        isAuthenticated={!!user}
+      >
         <VideoDetail video={mock} />
       </AppShell>
     );
@@ -28,7 +36,6 @@ export default async function VideoPage({ params }: Props) {
     notFound();
   }
 
-  const supabase = await createClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -52,6 +59,7 @@ export default async function VideoPage({ params }: Props) {
           ? video.channelId
           : channels[0]?.id ?? video.channelId
       }
+      isAuthenticated
     >
       <VideoDetail video={video} />
     </AppShell>

@@ -1,5 +1,6 @@
 "use client";
 
+import { signInWithGoogle } from "@/lib/auth/google-oauth";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
@@ -23,23 +24,6 @@ export function AuthControls() {
     return () => subscription.unsubscribe();
   }, []);
 
-  async function signInWithGoogle() {
-    const supabase = createClient();
-    const origin = window.location.origin;
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${origin}/auth/callback?next=/`,
-        scopes:
-          "https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile",
-        queryParams: {
-          access_type: "offline",
-          prompt: "consent",
-        },
-      },
-    });
-  }
-
   async function signOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -56,7 +40,11 @@ export function AuthControls() {
     return (
       <button
         type="button"
-        onClick={() => void signInWithGoogle()}
+        onClick={() =>
+          void signInWithGoogle(
+            `${window.location.pathname}${window.location.search}`,
+          ).catch(() => {})
+        }
         className="rounded-lg border border-line bg-raised px-3 py-1.5 text-xs font-medium text-[var(--text)] transition hover:bg-surface"
       >
         Sign in with Google
