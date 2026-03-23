@@ -18,19 +18,19 @@ struct VideoListView: View {
   var body: some View {
     Group {
       if isLoading && videos.isEmpty {
-        ProgressView("Videolar yükleniyor…")
+        ProgressView("Loading videos…")
           .frame(maxWidth: .infinity, maxHeight: .infinity)
       } else if let errorMessage {
         ContentUnavailableView(
-          "Videolar yüklenemedi",
+          "Couldn’t load videos",
           systemImage: "exclamationmark.triangle",
           description: Text(errorMessage)
         )
       } else if videos.isEmpty {
         ContentUnavailableView(
-          "Video yok",
+          "No videos",
           systemImage: "film",
-          description: Text("Bu kanalda son yüklemelerde video görünmüyor.")
+          description: Text("No recent uploads in this channel’s feed.")
         )
       } else {
         List(filteredVideos) { video in
@@ -43,7 +43,7 @@ struct VideoListView: View {
     }
     .navigationTitle(channel.title)
     .navigationBarTitleDisplayMode(.inline)
-    .searchable(text: $searchText, prompt: "Videolarda ara")
+    .searchable(text: $searchText, prompt: "Search videos in this channel")
     .task(id: channel.id) {
       await loadVideos()
     }
@@ -66,47 +66,5 @@ struct VideoListView: View {
     } catch {
       errorMessage = error.localizedDescription
     }
-  }
-}
-
-private struct VideoRow: View {
-  let video: YTVideo
-
-  var body: some View {
-    HStack(alignment: .top, spacing: 12) {
-      AsyncImage(url: video.thumbnailURL) { phase in
-        switch phase {
-        case .empty:
-          RoundedRectangle(cornerRadius: 8)
-            .fill(.quaternary)
-            .frame(width: 120, height: 68)
-        case let .success(img):
-          img
-            .resizable()
-            .scaledToFill()
-            .frame(width: 120, height: 68)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-        case .failure:
-          RoundedRectangle(cornerRadius: 8)
-            .fill(.quaternary)
-            .frame(width: 120, height: 68)
-        @unknown default:
-          EmptyView()
-        }
-      }
-      VStack(alignment: .leading, spacing: 4) {
-        Text(video.title)
-          .font(.subheadline.weight(.semibold))
-          .lineLimit(2)
-        Text(video.summaryShort)
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .lineLimit(2)
-        Text(video.durationLabel)
-          .font(.caption2)
-          .foregroundStyle(.tertiary)
-      }
-    }
-    .padding(.vertical, 4)
   }
 }

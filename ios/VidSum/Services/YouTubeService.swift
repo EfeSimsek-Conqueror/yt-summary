@@ -154,6 +154,86 @@ enum YouTubeService {
     return videos
   }
 
+  /// Global YouTube video search (`search.list`). Requires `youtube.readonly` scope.
+  static func searchVideos(accessToken: String, query: String) async throws -> [YTVideo] {
+    let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard q.count >= 2 else { return [] }
+
+    var components = URLComponents(
+      url: apiBase.appendingPathComponent("search"),
+      resolvingAgainstBaseURL: false
+    )!
+    components.queryItems = [
+      .init(name: "part", value: "snippet"),
+      .init(name: "type", value: "video"),
+      .init(name: "q", value: q),
+      .init(name: "maxResults", value: "25"),
+    ]
+
+    let (data, response) = try await dataRequest(url: components.url!, accessToken: accessToken)
+    try throwIfNeeded(response, data: data)
+
+    let decoded = try JSONDecoder().decode(SearchListResponse.self, from: data)
+    var ids: [String] = []
+    for item in decoded.items ?? [] {
+      guard let vid = item.id?.videoId else { continue }
+      ids.append(vid)
+    }
+    if ids.isEmpty { return [] }
+
+    var videos: [YTVideo] = []
+    for chunk in stride(from: 0, to: ids.count, by: 50) {
+      let batch = Array(ids[chunk ..< min(chunk + 50, ids.count)])
+      var vurl = URLComponents(
+        url: apiBase.appendingPathComponent("videos"),
+        resolvingAgainstBaseURL: false
+      )!
+      vurl.queryItems = [
+        .init(name: "part", value: "snippet,contentDetails"),
+        .init(name: "id", value: batch.joined(separator: ",")),
+      ]
+
+      let (vData, vRes) = try await dataRequest(url: vurl.url!, accessToken: accessToken)
+      try throwIfNeeded(vRes, data: vData)
+      let vDecoded = try JSONDecoder().decode(VideosListResponse.self, from: vData)
+
+      for item in vDecoded.items ?? [] {
+        guard let vid = item.id else { continue }
+        let title = item.snippet?.title ?? "Untitled"
+        let desc = item.snippet?.description ?? ""
+        let channelId = item.snippet?.channelId ?? ""
+        let durationIso = item.contentDetails?.duration ?? "PT0S"
+        let durationSec = ISO8601Duration.parseSeconds(durationIso) ?? 0
+        let summary =
+          desc.trimmingCharacters(in: .whitespacesAndNewlines).prefix(160)
+        let summaryStr =
+          summary.isEmpty
+          ? "Open for details. Full analysis in the web app when connected."
+          : String(summary)
+        let thumb =
+          (item.snippet?.thumbnails?.high?.url ?? item.snippet?.thumbnails?.medium?.url)
+          .flatMap(URL.init(string:))
+
+        videos.append(
+          YTVideo(
+            id: vid,
+            channelId: channelId,
+            title: title,
+            durationLabel: ISO8601Duration.formatLabel(durationIso),
+            durationSeconds: durationSec,
+            summaryShort: summaryStr,
+            thumbnailURL: thumb
+          )
+        )
+      }
+    }
+
+    let order = Dictionary(uniqueKeysWithValues: ids.enumerated().map { ($0.element, $0.offset) })
+    videos.sort { (order[$0.id] ?? 0) < (order[$1.id] ?? 0) }
+
+    return videos
+  }
+
   private static func dataRequest(url: URL, accessToken: String) async throws -> (Data, URLResponse) {
     var req = URLRequest(url: url)
     req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
@@ -226,8 +306,23 @@ private struct PlaylistRow: Decodable {
 private struct PlaylistSnippet: Decodable {
   let title: String?
   let description: String?
+  let channelId: String?
   let resourceId: VideoResourceId?
   let thumbnails: VideoThumbs?
+}
+
+private struct SearchListResponse: Decodable {
+  let items: [SearchItem]?
+}
+
+private struct SearchItem: Decodable {
+  let id: SearchIdEnvelope?
+  let snippet: PlaylistSnippet?
+}
+
+private struct SearchIdEnvelope: Decodable {
+  let kind: String?
+  let videoId: String?
 }
 
 private struct VideoResourceId: Decodable {

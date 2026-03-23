@@ -14,6 +14,7 @@
 		353801166777D4953B4DEA17 /* YouTubeWebPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A80530C3F10DBEA28A682B11 /* YouTubeWebPlayerView.swift */; };
 		468E47301EABA4F12F1F8CDF /* ISO8601Duration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6586779FCCA55E25F69419B1 /* ISO8601Duration.swift */; };
 		4E308C341C866C21BA893136 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = BFABF20A7BF0541800439B9D /* Supabase */; };
+		529B1B4824D528FB42CFBFBE /* VideoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A9FAC052F3552A9B92CC50B /* VideoRow.swift */; };
 		5DF68A37CAC14EB1E8D53B82 /* VidSumApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40737F4C30BDD0D25595FEE5 /* VidSumApp.swift */; };
 		5E3880B366BF4C033A2BA34D /* SupabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DCE7B4BEDBC8D8E23EB62CA /* SupabaseManager.swift */; };
 		91E846AD1F6434C214350A94 /* VideoDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94D809B227CED15F98C2B1C5 /* VideoDetailView.swift */; };
@@ -36,6 +37,7 @@
 		4E69B445BBD07B45FBC563C5 /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
 		50C9BA2551B3DA91B01A655E /* AppSecrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSecrets.swift; sourceTree = "<group>"; };
 		6586779FCCA55E25F69419B1 /* ISO8601Duration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ISO8601Duration.swift; sourceTree = "<group>"; };
+		8A9FAC052F3552A9B92CC50B /* VideoRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoRow.swift; sourceTree = "<group>"; };
 		8C0D09BC03F25FC495FE19E6 /* VidSum.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = VidSum.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		94D809B227CED15F98C2B1C5 /* VideoDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoDetailView.swift; sourceTree = "<group>"; };
 		9A410FF8EF32BA92AC54AAFC /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -126,6 +128,7 @@
 				288C1BDD4C8EA60E32CA7E27 /* LoginView.swift */,
 				94D809B227CED15F98C2B1C5 /* VideoDetailView.swift */,
 				ACD8B77FDE3523CF4C7EC4E6 /* VideoListView.swift */,
+				8A9FAC052F3552A9B92CC50B /* VideoRow.swift */,
 				A80530C3F10DBEA28A682B11 /* YouTubeWebPlayerView.swift */,
 			);
 			path = Views;
@@ -227,6 +230,7 @@
 				5DF68A37CAC14EB1E8D53B82 /* VidSumApp.swift in Sources */,
 				91E846AD1F6434C214350A94 /* VideoDetailView.swift in Sources */,
 				EE755CF24C2BA7E9FF6523D1 /* VideoListView.swift in Sources */,
+				529B1B4824D528FB42CFBFBE /* VideoRow.swift in Sources */,
 				32161E0D52FF5046ED242B82 /* YouTubeService.swift in Sources */,
 				353801166777D4953B4DEA17 /* YouTubeWebPlayerView.swift in Sources */,
 			);
@@ -297,7 +301,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				INFOPLIST_FILE = VidSum/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -317,7 +321,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				INFOPLIST_FILE = VidSum/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

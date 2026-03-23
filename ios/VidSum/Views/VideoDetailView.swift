@@ -68,7 +68,7 @@ struct VideoDetailView: View {
               .font(.title3.weight(.semibold))
               .padding(.vertical, 12)
           }
-          .accessibilityLabel("Önemli dakikaları aç")
+          .accessibilityLabel("Open key moments panel")
           Spacer()
         }
         .frame(width: 48)
@@ -101,7 +101,7 @@ struct VideoDetailView: View {
 
   private var momentsBlock: some View {
     VStack(alignment: .leading, spacing: 12) {
-      Text("Önemli dakikalar")
+      Text("Key moments")
         .font(.headline)
       ForEach(moments) { moment in
         momentRow(moment)
@@ -112,7 +112,7 @@ struct VideoDetailView: View {
   private var momentsSidePanel: some View {
     VStack(alignment: .leading, spacing: 0) {
       HStack {
-        Text("Önemli dakikalar")
+        Text("Key moments")
           .font(.headline)
         Spacer()
         Button {
@@ -122,7 +122,7 @@ struct VideoDetailView: View {
             .symbolRenderingMode(.hierarchical)
             .foregroundStyle(.secondary)
         }
-        .accessibilityLabel("Paneli kapat")
+        .accessibilityLabel("Close panel")
       }
       .padding(.horizontal)
       .padding(.top, 12)

@@ -1,5 +1,10 @@
 import SwiftUI
 
+private enum HomeSearchScope: String, CaseIterable {
+  case channels = "Channels"
+  case videos = "Videos"
+}
+
 struct HomeView: View {
   @EnvironmentObject private var appModel: AppViewModel
 
@@ -7,8 +12,12 @@ struct HomeView: View {
   @State private var isLoadingChannels = false
   @State private var loadError: String?
   @State private var searchText = ""
+  @State private var searchScope: HomeSearchScope = .channels
+  @State private var videoSearchResults: [YTVideo] = []
+  @State private var isSearchingVideos = false
+  @State private var videoSearchError: String?
+  @State private var videoSearchTask: Task<Void, Never>?
 
-  /// Shown in the nav bar so you can confirm you’re on a new build (auto sign-in does not change UI version).
   private var appVersionLabel: String {
     let v =
       Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
@@ -37,23 +46,33 @@ struct HomeView: View {
         } else {
           List {
             Section {
-              Text("Yükleme 0.2.0: üstte ara · sağda Sign out · solda sürüm. Bunlar yoksa uygulamayı sil, Xcode Run.")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-              .padding(.vertical, 4)
-            }
-            ForEach(filteredChannels) { ch in
-              NavigationLink(value: ch) {
-                ChannelRow(channel: ch)
+              Picker("Search scope", selection: $searchScope) {
+                ForEach(HomeSearchScope.allCases, id: \.self) { scope in
+                  Text(scope.rawValue).tag(scope)
+                }
               }
+              .pickerStyle(.segmented)
+            }
+
+            if searchScope == .channels {
+              ForEach(filteredChannels) { ch in
+                NavigationLink(value: ch) {
+                  ChannelRow(channel: ch)
+                }
+              }
+            } else {
+              videoSearchSection
             }
           }
           .listStyle(.plain)
         }
       }
-      .navigationTitle("Abonelikler")
+      .navigationTitle("Subscriptions")
       .navigationBarTitleDisplayMode(.inline)
-      .searchable(text: $searchText, prompt: "Kanallarda ara")
+      .searchable(
+        text: $searchText,
+        prompt: searchScope == .channels ? "Search subscribed channels" : "Search YouTube videos"
+      )
       .toolbar {
         ToolbarItem(placement: .topBarLeading) {
           Text(appVersionLabel)
@@ -72,9 +91,79 @@ struct HomeView: View {
       .navigationDestination(for: YTChannel.self) { ch in
         VideoListView(channel: ch, accessToken: appModel.session?.providerToken)
       }
+      .navigationDestination(for: YTVideo.self) { video in
+        VideoDetailView(video: video)
+      }
+      .onChange(of: searchText) { _, newValue in
+        guard searchScope == .videos else { return }
+        videoSearchTask?.cancel()
+        videoSearchTask = Task {
+          try? await Task.sleep(nanoseconds: 450_000_000)
+          guard !Task.isCancelled else { return }
+          await runVideoSearch(query: newValue)
+        }
+      }
+      .onChange(of: searchScope) { _, newScope in
+        videoSearchTask?.cancel()
+        if newScope == .channels {
+          videoSearchResults = []
+          videoSearchError = nil
+        } else {
+          Task { await runVideoSearch(query: searchText) }
+        }
+      }
     }
     .task(id: appModel.session?.user.id) {
       await loadChannels()
+    }
+  }
+
+  @ViewBuilder
+  private var videoSearchSection: some View {
+    let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    if isSearchingVideos, q.count >= 2 {
+      HStack {
+        Spacer()
+        ProgressView()
+        Spacer()
+      }
+    } else if let videoSearchError {
+      Text(videoSearchError)
+        .font(.caption)
+        .foregroundStyle(.red)
+    } else if q.count < 2 {
+      Text("Type at least 2 characters to search videos on YouTube.")
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+    } else if videoSearchResults.isEmpty {
+      Text("No videos found.")
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+    } else {
+      ForEach(videoSearchResults) { video in
+        NavigationLink(value: video) {
+          VideoRow(video: video)
+        }
+      }
+    }
+  }
+
+  private func runVideoSearch(query: String) async {
+    guard let token = appModel.session?.providerToken else { return }
+    let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard q.count >= 2 else {
+      videoSearchResults = []
+      videoSearchError = nil
+      return
+    }
+    isSearchingVideos = true
+    videoSearchError = nil
+    defer { isSearchingVideos = false }
+    do {
+      videoSearchResults = try await YouTubeService.searchVideos(accessToken: token, query: q)
+    } catch {
+      videoSearchError = error.localizedDescription
+      videoSearchResults = []
     }
   }
 

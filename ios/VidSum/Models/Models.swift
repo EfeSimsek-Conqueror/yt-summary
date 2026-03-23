@@ -39,12 +39,12 @@ enum VideoMomentGenerator {
       if i == 0, !summarySnippet.isEmpty {
         bullets = [String(summarySnippet.prefix(120))]
       } else {
-        bullets = ["\(formatClock(start)) – \(formatClock(end)) aralığına atla."]
+        bullets = ["Jump to \(formatClock(start)) – \(formatClock(end))."]
       }
       rows.append(
         VideoMoment(
           id: i,
-          title: "Bölüm \(i + 1)",
+          title: "Part \(i + 1)",
           startSeconds: start,
           endSeconds: end,
           bullets: bullets
