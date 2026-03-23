@@ -35,16 +35,24 @@ struct HomeView: View {
             description: Text(loadError)
           )
         } else {
-          List(filteredChannels) { ch in
-            NavigationLink(value: ch) {
-              ChannelRow(channel: ch)
+          List {
+            Section {
+              Text("Yükleme 0.2.0: üstte ara · sağda Sign out · solda sürüm. Bunlar yoksa uygulamayı sil, Xcode Run.")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+              .padding(.vertical, 4)
+            }
+            ForEach(filteredChannels) { ch in
+              NavigationLink(value: ch) {
+                ChannelRow(channel: ch)
+              }
             }
           }
           .listStyle(.plain)
         }
       }
       .navigationTitle("Abonelikler")
-      .navigationBarTitleDisplayMode(.large)
+      .navigationBarTitleDisplayMode(.inline)
       .searchable(text: $searchText, prompt: "Kanallarda ara")
       .toolbar {
         ToolbarItem(placement: .topBarLeading) {
