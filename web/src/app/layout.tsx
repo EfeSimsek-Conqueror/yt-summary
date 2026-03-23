@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TubeSummary",
-  description: "Summaries and segment breakdowns for your YouTube subscriptions",
+  title: "VidSum",
+  description:
+    "VidSum — AI summaries, segments, and takeaways for your YouTube subscriptions and search.",
 };
 
 export default function RootLayout({

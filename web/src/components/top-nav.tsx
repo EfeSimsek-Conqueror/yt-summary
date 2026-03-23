@@ -11,7 +11,7 @@ export function TopNav() {
           className="h-7 w-7 rounded-md bg-gradient-to-br from-red-500 to-red-800"
           aria-hidden
         />
-        <span className="text-[15px] font-bold tracking-tight">TubeSummary</span>
+        <span className="text-[15px] font-bold tracking-tight">VidSum</span>
       </div>
       <div className="flex items-center gap-4">
         <AuthControls />
