@@ -1,3 +1,4 @@
+import AuthenticationServices
 import Foundation
 import Supabase
 import SwiftUI
@@ -34,8 +35,9 @@ final class AppViewModel: ObservableObject {
     }
   }
 
-  /// Safari (`UIApplication.open`) + `vidsum://` — **does not** use `ASWebAuthenticationSession`
-  /// (avoids `WebAuthenticationSession error 1` when Swift resolves the wrong `signInWithOAuth` overload).
+  /// Uses `ASWebAuthenticationSession` (via Supabase `signInWithOAuth` + **named** `configure:`).
+  /// Full Safari + `UIApplication.open` showed “Safari can’t open the page” after Google because the
+  /// `vidsum://` redirect isn’t a normal web page — the auth session intercepts it instead.
   func signInWithGoogle() async {
     isSigningIn = true
     errorMessage = nil
@@ -49,17 +51,18 @@ final class AppViewModel: ObservableObject {
         "https://www.googleapis.com/auth/userinfo.profile",
       ].joined(separator: " ")
 
-      let authURL = try client.auth.getOAuthSignInURL(
+      _ = try await client.auth.signInWithOAuth(
         provider: .google,
-        scopes: scopes,
         redirectTo: redirect,
+        scopes: scopes,
         queryParams: [
           ("access_type", "offline"),
           ("prompt", "consent"),
-        ]
+        ],
+        configure: { session in
+          session.prefersEphemeralWebBrowserSession = false
+        }
       )
-      let resultURL = try await OAuthCallbackBridge.openAuthAndWait(authURL: authURL)
-      _ = try await client.auth.session(from: resultURL)
       await refreshSession()
     } catch {
       if error is CancellationError { return }
@@ -69,9 +72,8 @@ final class AppViewModel: ObservableObject {
 
   private static func describeSignInError(_ error: Error) -> String {
     let ns = error as NSError
-    // Same domain as `ASWebAuthenticationSession` failures (we avoid that API; kept for stale builds / system quirks).
-    if ns.domain == "com.apple.AuthenticationServices.WebAuthenticationSession" {
-      return "Sign-in was cancelled or could not open the browser. Try again."
+    if ns.domain == ASWebAuthenticationSessionErrorDomain, ns.code == ASWebAuthenticationSessionError.canceledLogin.rawValue {
+      return "Sign-in was cancelled. Try again."
     }
     return error.localizedDescription
   }
