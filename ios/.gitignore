@@ -1,6 +1,3 @@
-# Real keys — copy from AppSecrets.swift.example after clone
-VidSum/AppSecrets.swift
-
 Secrets.xcconfig
 **/xcuserdata/
 *.xcworkspace/xcuserdata/
