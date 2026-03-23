@@ -34,7 +34,8 @@ final class AppViewModel: ObservableObject {
     }
   }
 
-  /// Safari + `vidsum://` via `OAuthCallbackBridge` (same flow as `signInWithOAuth` + custom `launchFlow`).
+  /// Safari (`UIApplication.open`) + `vidsum://` — **does not** use `ASWebAuthenticationSession`
+  /// (avoids `WebAuthenticationSession error 1` when Swift resolves the wrong `signInWithOAuth` overload).
   func signInWithGoogle() async {
     isSigningIn = true
     errorMessage = nil
@@ -48,22 +49,31 @@ final class AppViewModel: ObservableObject {
         "https://www.googleapis.com/auth/userinfo.profile",
       ].joined(separator: " ")
 
-      _ = try await client.auth.signInWithOAuth(
+      let authURL = try client.auth.getOAuthSignInURL(
         provider: .google,
-        redirectTo: redirect,
         scopes: scopes,
+        redirectTo: redirect,
         queryParams: [
           ("access_type", "offline"),
           ("prompt", "consent"),
         ]
-      ) { authURL in
-        try await OAuthCallbackBridge.openAuthAndWait(authURL: authURL)
-      }
+      )
+      let resultURL = try await OAuthCallbackBridge.openAuthAndWait(authURL: authURL)
+      _ = try await client.auth.session(from: resultURL)
       await refreshSession()
     } catch {
       if error is CancellationError { return }
-      errorMessage = error.localizedDescription
+      errorMessage = Self.describeSignInError(error)
     }
+  }
+
+  private static func describeSignInError(_ error: Error) -> String {
+    let ns = error as NSError
+    // Same domain as `ASWebAuthenticationSession` failures (we avoid that API; kept for stale builds / system quirks).
+    if ns.domain == "com.apple.AuthenticationServices.WebAuthenticationSession" {
+      return "Sign-in was cancelled or could not open the browser. Try again."
+    }
+    return error.localizedDescription
   }
 
   func signOut() async {
