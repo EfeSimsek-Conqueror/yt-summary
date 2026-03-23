@@ -38,7 +38,7 @@ Native **Swift / SwiftUI** client for the same Supabase + Google + YouTube Data 
 
 ## What’s included
 
-- Google sign-in via **Supabase** (`ASWebAuthenticationSession`)
+- Google sign-in via **Supabase** — opens **Safari** (`UIApplication.open`) and completes the PKCE flow when the app receives `vidsum://auth-callback` (more reliable on real devices than `ASWebAuthenticationSession` alone)
 - **Subscriptions** list (`subscriptions.list`)
 - **Recent uploads** per channel (uploads playlist → `playlistItems` → `videos`)
 - Video **detail** screen (summary text; full transcript + AI analysis still live in the web app today)

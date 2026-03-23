@@ -34,32 +34,35 @@ final class AppViewModel: ObservableObject {
     }
   }
 
+  /// Uses Safari + `vidsum://` callback (see `OAuthCallbackBridge`) instead of `ASWebAuthenticationSession`.
   func signInWithGoogle() async {
     isSigningIn = true
     errorMessage = nil
     defer { isSigningIn = false }
+    OAuthCallbackBridge.cancelPending()
     do {
+      let redirect = URL(string: "vidsum://auth-callback")!
       let scopes = [
         "https://www.googleapis.com/auth/youtube.readonly",
         "https://www.googleapis.com/auth/userinfo.email",
         "https://www.googleapis.com/auth/userinfo.profile",
       ].joined(separator: " ")
 
-      let redirect = URL(string: "vidsum://auth-callback")!
-      _ = try await client.auth.signInWithOAuth(
+      let authURL = try client.auth.getOAuthSignInURL(
         provider: .google,
-        redirectTo: redirect,
         scopes: scopes,
+        redirectTo: redirect,
         queryParams: [
           ("access_type", "offline"),
           ("prompt", "consent"),
-        ],
-        configure: { session in
-          // Avoid “error 1” / canceled session on some devices when ephemeral Safari is forced
-          session.prefersEphemeralWebBrowserSession = false
-        }
+        ]
       )
+
+      let resultURL = try await OAuthCallbackBridge.openAuthAndWait(authURL: authURL)
+      _ = try await client.auth.session(from: resultURL)
+      await refreshSession()
     } catch {
+      if error is CancellationError { return }
       errorMessage = error.localizedDescription
     }
   }

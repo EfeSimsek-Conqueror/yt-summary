@@ -9,7 +9,10 @@ struct VidSumApp: App {
       ContentView()
         .environmentObject(appModel)
         .onOpenURL { url in
-          // OAuth redirect (vidsum://auth-callback?...) — required for reliable PKCE completion on device
+          if OAuthCallbackBridge.receiveCallback(url) {
+            // Completes `openAuthAndWait` — session is finished in `signInWithGoogle`
+            return
+          }
           SupabaseManager.client.auth.handle(url)
           Task { await appModel.refreshSession() }
         }

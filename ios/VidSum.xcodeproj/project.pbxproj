@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		181D5635C874E9C2BC97234F /* OAuthCallbackBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAA7DBE6EEF7886BB4CE4AC9 /* OAuthCallbackBridge.swift */; };
 		1ED51D200E5ADE079EEBE9DC /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4346CCD4D96ED12BF226D45 /* Models.swift */; };
 		25E665C6F96A021B238B72C9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1906199ED57702AC4F09F8D /* ContentView.swift */; };
 		32161E0D52FF5046ED242B82 /* YouTubeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05EC840CBC7F8C19F75ACD7E /* YouTubeService.swift */; };
@@ -39,6 +40,7 @@
 		A4346CCD4D96ED12BF226D45 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		ACD8B77FDE3523CF4C7EC4E6 /* VideoListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoListView.swift; sourceTree = "<group>"; };
 		DA5AEB93D17A66D2BB30B315 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		DAA7DBE6EEF7886BB4CE4AC9 /* OAuthCallbackBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OAuthCallbackBridge.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -97,6 +99,7 @@
 		7C140F378F6C47603C367855 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				DAA7DBE6EEF7886BB4CE4AC9 /* OAuthCallbackBridge.swift */,
 				3DCE7B4BEDBC8D8E23EB62CA /* SupabaseManager.swift */,
 				05EC840CBC7F8C19F75ACD7E /* YouTubeService.swift */,
 			);
@@ -212,6 +215,7 @@
 				468E47301EABA4F12F1F8CDF /* ISO8601Duration.swift in Sources */,
 				CAF0A6B240879695047B2264 /* LoginView.swift in Sources */,
 				1ED51D200E5ADE079EEBE9DC /* Models.swift in Sources */,
+				181D5635C874E9C2BC97234F /* OAuthCallbackBridge.swift in Sources */,
 				5E3880B366BF4C033A2BA34D /* SupabaseManager.swift in Sources */,
 				5DF68A37CAC14EB1E8D53B82 /* VidSumApp.swift in Sources */,
 				91E846AD1F6434C214350A94 /* VideoDetailView.swift in Sources */,
