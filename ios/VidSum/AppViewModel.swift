@@ -45,13 +45,19 @@ final class AppViewModel: ObservableObject {
         "https://www.googleapis.com/auth/userinfo.profile",
       ].joined(separator: " ")
 
+      let redirect = URL(string: "vidsum://auth-callback")!
       _ = try await client.auth.signInWithOAuth(
         provider: .google,
+        redirectTo: redirect,
         scopes: scopes,
         queryParams: [
           ("access_type", "offline"),
           ("prompt", "consent"),
-        ]
+        ],
+        configure: { session in
+          // Avoid “error 1” / canceled session on some devices when ephemeral Safari is forced
+          session.prefersEphemeralWebBrowserSession = false
+        }
       )
     } catch {
       errorMessage = error.localizedDescription

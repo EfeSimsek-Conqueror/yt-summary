@@ -23,11 +23,12 @@ Native **Swift / SwiftUI** client for the same Supabase + Google + YouTube Data 
    ```
 
 3. **Supabase Auth → Redirect URLs**  
-   Add:
+   Add **exactly**:
 
    - `vidsum://auth-callback`
 
-   This must match `SupabaseManager` and `Info.plist` (`CFBundleURLSchemes` = `vidsum`).
+   This must match `SupabaseManager` and `Info.plist` (`CFBundleURLSchemes` = `vidsum`).  
+   If this is missing, **Google sign-in** can fail with `WebAuthenticationSession error 1`.
 
 4. **Google Cloud OAuth (iOS)**  
    For some setups you also add the app’s bundle ID and redirect to Google’s OAuth client used by Supabase. Follow [Supabase: Google sign-in](https://supabase.com/docs/guides/auth/social-login/auth-google?platform=swift) for native apps.
