@@ -12,7 +12,6 @@
 		32161E0D52FF5046ED242B82 /* YouTubeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05EC840CBC7F8C19F75ACD7E /* YouTubeService.swift */; };
 		468E47301EABA4F12F1F8CDF /* ISO8601Duration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6586779FCCA55E25F69419B1 /* ISO8601Duration.swift */; };
 		4E308C341C866C21BA893136 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = BFABF20A7BF0541800439B9D /* Supabase */; };
-		50B5D034D583B255AC2BB18F /* AppSecrets.swift.example in Resources */ = {isa = PBXBuildFile; fileRef = CF85405D7C183F966EC1D93F /* AppSecrets.swift.example */; };
 		5DF68A37CAC14EB1E8D53B82 /* VidSumApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40737F4C30BDD0D25595FEE5 /* VidSumApp.swift */; };
 		5E3880B366BF4C033A2BA34D /* SupabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DCE7B4BEDBC8D8E23EB62CA /* SupabaseManager.swift */; };
 		91E846AD1F6434C214350A94 /* VideoDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94D809B227CED15F98C2B1C5 /* VideoDetailView.swift */; };
@@ -39,7 +38,6 @@
 		A1906199ED57702AC4F09F8D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A4346CCD4D96ED12BF226D45 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		ACD8B77FDE3523CF4C7EC4E6 /* VideoListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoListView.swift; sourceTree = "<group>"; };
-		CF85405D7C183F966EC1D93F /* AppSecrets.swift.example */ = {isa = PBXFileReference; path = AppSecrets.swift.example; sourceTree = "<group>"; };
 		DA5AEB93D17A66D2BB30B315 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -83,7 +81,6 @@
 			isa = PBXGroup;
 			children = (
 				50C9BA2551B3DA91B01A655E /* AppSecrets.swift */,
-				CF85405D7C183F966EC1D93F /* AppSecrets.swift.example */,
 				4E69B445BBD07B45FBC563C5 /* AppViewModel.swift */,
 				A1906199ED57702AC4F09F8D /* ContentView.swift */,
 				DA5AEB93D17A66D2BB30B315 /* Info.plist */,
@@ -197,7 +194,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				50B5D034D583B255AC2BB18F /* AppSecrets.swift.example in Resources */,
 				CD39AFC81AF99198294B7BD7 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

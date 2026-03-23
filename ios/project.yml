@@ -18,6 +18,8 @@ targets:
       - path: VidSum
         excludes:
           - "**/.DS_Store"
+          # Avoid XcodeGen treating *.example as a resource bundle file
+          - "**/*.example"
     resources:
       - path: VidSum/Resources/Assets.xcassets
     dependencies:
