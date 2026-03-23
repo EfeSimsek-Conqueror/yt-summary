@@ -8,6 +8,14 @@ struct HomeView: View {
   @State private var loadError: String?
   @State private var searchText = ""
 
+  /// Shown in the nav bar so you can confirm you’re on a new build (auto sign-in does not change UI version).
+  private var appVersionLabel: String {
+    let v =
+      Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+    let b = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+    return "\(v) (\(b))"
+  }
+
   private var filteredChannels: [YTChannel] {
     let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     if q.isEmpty { return channels }
@@ -39,6 +47,12 @@ struct HomeView: View {
       .navigationBarTitleDisplayMode(.large)
       .searchable(text: $searchText, prompt: "Kanallarda ara")
       .toolbar {
+        ToolbarItem(placement: .topBarLeading) {
+          Text(appVersionLabel)
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+            .accessibilityLabel("App version \(appVersionLabel)")
+        }
         ToolbarItem(placement: .topBarTrailing) {
           Button {
             Task { await appModel.signOut() }
