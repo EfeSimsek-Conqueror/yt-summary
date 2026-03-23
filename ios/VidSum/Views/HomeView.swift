@@ -36,20 +36,23 @@ struct HomeView: View {
         }
       }
       .navigationTitle("Abonelikler")
+      .navigationBarTitleDisplayMode(.large)
       .searchable(text: $searchText, prompt: "Kanallarda ara")
+      .toolbar {
+        ToolbarItem(placement: .topBarTrailing) {
+          Button {
+            Task { await appModel.signOut() }
+          } label: {
+            Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right")
+          }
+        }
+      }
       .navigationDestination(for: YTChannel.self) { ch in
         VideoListView(channel: ch, accessToken: appModel.session?.providerToken)
       }
     }
     .task(id: appModel.session?.user.id) {
       await loadChannels()
-    }
-    .toolbar {
-      ToolbarItem(placement: .topBarTrailing) {
-        Button("Çıkış") {
-          Task { await appModel.signOut() }
-        }
-      }
     }
   }
 

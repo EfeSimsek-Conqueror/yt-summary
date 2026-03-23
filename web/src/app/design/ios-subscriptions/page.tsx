@@ -20,7 +20,10 @@ export default function IosSubscriptionsDesignPage() {
         </div>
       </div>
 
-      <div className="px-4 pt-2">
+      <div className="flex justify-end px-4 pt-2">
+        <span className="text-[17px] leading-tight text-[#0A84FF]">Sign out</span>
+      </div>
+      <div className="px-4 pt-1">
         <h1 className="text-[34px] font-bold leading-tight tracking-tight">
           Abonelikler
         </h1>
