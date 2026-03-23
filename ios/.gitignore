@@ -1,0 +1,4 @@
+# Local Supabase keys (copy from Secrets.example.xcconfig)
+Secrets.xcconfig
+**/xcuserdata/
+*.xcworkspace/xcuserdata/

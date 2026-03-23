@@ -1,0 +1,33 @@
+name: VidSum
+options:
+  bundleIdPrefix: com.vidsum
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+packages:
+  Supabase:
+    url: https://github.com/supabase/supabase-swift
+    from: 2.0.0
+
+targets:
+  VidSum:
+    type: application
+    platform: iOS
+    sources:
+      - path: VidSum
+        excludes:
+          - "**/.DS_Store"
+    resources:
+      - path: VidSum/Resources/Assets.xcassets
+    dependencies:
+      - package: Supabase
+        product: Supabase
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.vidsum.app
+        INFOPLIST_FILE: VidSum/Info.plist
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic
+        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "0.1.0"
