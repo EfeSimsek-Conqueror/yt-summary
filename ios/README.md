@@ -44,3 +44,25 @@ Native **Swift / SwiftUI** client for the same Supabase + Google + YouTube Data 
 ## App icon
 
 Add an **App Icon** set in `Assets.xcassets` when you prepare a TestFlight / App Store build.
+
+## Sorun giderme
+
+### “Build input file cannot be found: …/AppSecrets.swift”
+
+Xcode **yalnızca** `ios/VidSum/AppSecrets.swift` dosyasını derler; adı **`AppSecrets.swift.example` olan dosya aynı şey değildir**.
+
+- Projede **mutlaka** `VidSum/AppSecrets.swift` olmalı (uzantı `.swift`, isimde `.example` yok).
+- Elinizde sadece `AppSecrets.swift.example` varsa Finder veya Terminal ile kopyalayın:
+
+  ```bash
+  cd ios/VidSum
+  cp AppSecrets.swift.example AppSecrets.swift
+  ```
+
+  Sonra Xcode’da sol panelden **`.example` dosyasını projeye eklemişseniz** onu kaldırın; derlenmesi gereken tek dosya `AppSecrets.swift`.
+
+- En güncel hali için: repo kökünde `git pull`, `ios/VidSum/AppSecrets.swift` Git’te gelmiş olmalı.
+
+### “Signing requires a development team”
+
+Xcode → hedef **VidSum** → **Signing & Capabilities** → **Team** alanından Apple ID ile bir ekip seçin (kişisel hesap yeterli).
