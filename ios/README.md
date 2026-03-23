@@ -10,8 +10,15 @@ Native **Swift / SwiftUI** client for the same Supabase + Google + YouTube Data 
 ## Setup
 
 1. **Secrets**  
-   The repo includes `VidSum/AppSecrets.swift` with **placeholders** so Xcode always finds the file. Replace `YOUR_PROJECT_REF` and `YOUR_SUPABASE_ANON_KEY` with the same values as `web/.env.local` (`NEXT_PUBLIC_SUPABASE_*`).  
-   Do **not** commit real keys to a public repo; keep local changes or use a private fork.
+   After `git clone`, create local `VidSum/AppSecrets.swift` (not committed):
+
+   ```bash
+   cd ios
+   cp VidSum/AppSecrets.swift.example VidSum/AppSecrets.swift
+   ```
+
+   Edit `AppSecrets.swift` and paste `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` from `web/.env.local`.  
+   Real keys stay on your machine only — the file is listed in `ios/.gitignore`.
 
 2. **Generate the Xcode project**
 
