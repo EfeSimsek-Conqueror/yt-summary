@@ -1,9 +1,17 @@
-# Railway: set this folder as the service Root Directory in the dashboard,
-# or deploy from the `web` directory (linked service).
+# VidSum web — Railway service: yt-summary (Next.js)
+# Dashboard:
+# https://railway.com/project/8b3c8e68-75c2-4721-a0f2-fe4934d94add/service/4fed7b6b-f5e5-4aaa-b2c6-ff835d5f47dd
+# Environment (production): 348285de-39ec-4019-bd66-ea3b0679bef2
+#
+# Repo: set Root Directory to `web` if deploying from the monorepo root, or deploy from this folder.
+# CLI: `cd web && railway link` (already linked to sublime-manifestation / yt-summary)
+
 [build]
 builder = "nixpacks"
 
 [deploy]
+# Next.js reads PORT automatically.
+startCommand = "npm run start"
 healthcheckPath = "/"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
