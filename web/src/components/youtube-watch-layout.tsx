@@ -64,6 +64,7 @@ type ContentKind =
   | "podcast"
   | "vlog"
   | "review"
+  | "music"
   | "other";
 
 const CONTENT_KINDS = new Set<string>([
@@ -75,6 +76,7 @@ const CONTENT_KINDS = new Set<string>([
   "podcast",
   "vlog",
   "review",
+  "music",
   "other",
 ]);
 
@@ -95,6 +97,12 @@ function needsFictionSpoilerGate(
   return hasSpoilers && FICTION_SPOILER_KINDS.includes(kind);
 }
 
+type HypeMoment = {
+  startSec: number;
+  endSec?: number;
+  label?: string;
+};
+
 type AnalysisPayload = {
   contentKind: ContentKind;
   hasSpoilers: boolean;
@@ -103,6 +111,7 @@ type AnalysisPayload = {
   revelations: string[];
   keyPoints: string[];
   segments: Segment[];
+  hypeMoments: HypeMoment[];
 };
 
 type ApiSegment = {
@@ -113,6 +122,41 @@ type ApiSegment = {
   mood?: string;
   bullets: string[];
 };
+
+function mapApiHypeMoments(rows: unknown): HypeMoment[] {
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+  const out: HypeMoment[] = [];
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const o = row as Record<string, unknown>;
+    const start =
+      typeof o.start_sec === "number"
+        ? o.start_sec
+        : Number(o.start_sec);
+    if (!Number.isFinite(start) || start < 0) continue;
+    const endRaw = o.end_sec;
+    const endNum =
+      endRaw === undefined
+        ? undefined
+        : typeof endRaw === "number"
+          ? endRaw
+          : Number(endRaw);
+    const endSec =
+      endNum !== undefined &&
+      Number.isFinite(endNum) &&
+      endNum >= start
+        ? endNum
+        : undefined;
+    const label =
+      typeof o.label === "string" && o.label.trim()
+        ? o.label.trim()
+        : undefined;
+    out.push({ startSec: start, endSec: endSec, label });
+  }
+  return out;
+}
 
 function mapApiSegments(rows: ApiSegment[]): Segment[] {
   return rows.map((s) => {
@@ -133,15 +177,29 @@ function mapApiSegments(rows: ApiSegment[]): Segment[] {
   });
 }
 
+/** Slow networks + dev Strict Mode can delay `onReady`; avoid false “slow” too early. */
+const PLAYER_ON_READY_MS = 45_000;
+
 export function YoutubeWatchLayout({ video, channelLabel }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YT.Player | null>(null);
-  const [playerReady, setPlayerReady] = useState(false);
+  /** loading = waiting for API or onReady; ready = can seek; error/timeout = embed failed or stuck */
+  const [playerPhase, setPlayerPhase] = useState<
+    "loading" | "ready" | "error" | "timeout"
+  >("loading");
+  const playerReady = playerPhase === "ready";
   const [playhead, setPlayhead] = useState(0);
   const [analysis, setAnalysis] = useState<AnalysisPayload | null>(null);
   const [analysisBusy, setAnalysisBusy] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [spoilersRevealed, setSpoilersRevealed] = useState(false);
+  /** Bumps to destroy/recreate the YT.Player (e.g. after timeout). */
+  const [playerRetryKey, setPlayerRetryKey] = useState(0);
+  /**
+   * When the IFrame API player fails or is slow, show a plain youtube.com/embed iframe
+   * so the video still plays (segment seek needs the API player).
+   */
+  const [embedFallback, setEmbedFallback] = useState(false);
 
   const canEmbed = isLikelyYoutubeVideoId(video.id);
 
@@ -150,6 +208,8 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
     setAnalysisError(null);
     setAnalysisBusy(false);
     setSpoilersRevealed(false);
+    setPlayerRetryKey(0);
+    setEmbedFallback(false);
   }, [video.id]);
 
   const segments = analysis?.segments ?? video.segments;
@@ -170,7 +230,8 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
   }));
 
   useEffect(() => {
-    if (!canEmbed || !wrapRef.current) return;
+    if (!canEmbed || embedFallback) return;
+    if (!wrapRef.current) return;
 
     const el = wrapRef.current;
     const elId = `yt-embed-${video.id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
@@ -178,33 +239,73 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
 
     let cancelled = false;
     let ytPlayer: YT.Player | null = null;
+    let onReadyTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
-    void ensureYoutubeIframeApi().then(() => {
-      if (cancelled || !document.getElementById(elId)) return;
-      ytPlayer = new YT.Player(elId, {
-        videoId: video.id,
-        width: "100%",
-        height: "100%",
-        playerVars: {
-          enablejsapi: 1,
-          origin:
-            typeof window !== "undefined" ? window.location.origin : undefined,
-          rel: 0,
-          modestbranding: 1,
-        },
-        events: {
-          onReady: (e) => {
-            if (cancelled) return;
-            playerRef.current = e.target;
-            setPlayerReady(true);
-          },
-        },
+    setPlayerPhase("loading");
+
+    void ensureYoutubeIframeApi()
+      .then(() => {
+        if (cancelled || !document.getElementById(elId)) return;
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (cancelled || !document.getElementById(elId)) return;
+            onReadyTimeoutId = setTimeout(() => {
+              if (!cancelled) {
+                setPlayerPhase((p) => (p === "loading" ? "timeout" : p));
+                setEmbedFallback(true);
+              }
+            }, PLAYER_ON_READY_MS);
+
+            ytPlayer = new YT.Player(elId, {
+              videoId: video.id,
+              width: "100%",
+              height: "100%",
+              playerVars: {
+                enablejsapi: 1,
+                origin:
+                  typeof window !== "undefined"
+                    ? window.location.origin
+                    : undefined,
+                rel: 0,
+                modestbranding: 1,
+                playsinline: 1,
+              },
+              events: {
+                onReady: (e) => {
+                  if (cancelled) return;
+                  if (onReadyTimeoutId !== undefined) {
+                    clearTimeout(onReadyTimeoutId);
+                    onReadyTimeoutId = undefined;
+                  }
+                  playerRef.current = e.target;
+                  setPlayerPhase("ready");
+                },
+                onError: () => {
+                  if (cancelled) return;
+                  if (onReadyTimeoutId !== undefined) {
+                    clearTimeout(onReadyTimeoutId);
+                    onReadyTimeoutId = undefined;
+                  }
+                  setPlayerPhase("error");
+                  setEmbedFallback(true);
+                },
+              },
+            });
+          });
+        });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPlayerPhase("error");
+          setEmbedFallback(true);
+        }
       });
-    });
 
     return () => {
       cancelled = true;
-      setPlayerReady(false);
+      if (onReadyTimeoutId !== undefined) {
+        clearTimeout(onReadyTimeoutId);
+      }
       try {
         ytPlayer?.destroy();
       } catch {
@@ -212,7 +313,7 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
       }
       playerRef.current = null;
     };
-  }, [video.id, canEmbed]);
+  }, [video.id, canEmbed, playerRetryKey, embedFallback]);
 
   useEffect(() => {
     if (!playerReady) return;
@@ -267,6 +368,7 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
           revelations?: unknown;
           keyPoints?: unknown;
           segments?: ApiSegment[];
+          hypeMoments?: unknown;
         };
         const revelations = Array.isArray(d.revelations)
           ? d.revelations.filter((x): x is string => typeof x === "string")
@@ -295,6 +397,7 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
           revelations,
           keyPoints,
           segments: mapApiSegments(d.segments),
+          hypeMoments: mapApiHypeMoments(d.hypeMoments),
         });
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") {
@@ -327,7 +430,24 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
     }
   }
 
-  const canJump = canEmbed && playerReady;
+  let activeHypeIdx = -1;
+  const hypeList = analysis?.hypeMoments;
+  if (hypeList && hypeList.length > 0) {
+    for (let i = 0; i < hypeList.length; i++) {
+      const h = hypeList[i];
+      const windowEnd = h.endSec ?? h.startSec + 3;
+      if (playhead >= h.startSec && playhead <= windowEnd) {
+        activeHypeIdx = i;
+        break;
+      }
+    }
+  }
+
+  /** Segment/hype seek needs the JS API player; simple iframe embed cannot seek programmatically. */
+  const canJump = canEmbed && playerReady && !embedFallback;
+
+  const youtubeWatchUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(video.id)}`;
+  const youtubeEmbedSrc = `https://www.youtube.com/embed/${encodeURIComponent(video.id)}?rel=0&modestbranding=1&playsinline=1`;
 
   return (
     <div className="grid gap-7 lg:grid-cols-[1fr_380px] lg:items-start">
@@ -341,7 +461,15 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
                 : `relative mb-4 aspect-video overflow-hidden rounded-xl border border-line bg-gradient-to-br ${thumbClass(video.id)}`
           }
         >
-          {canEmbed ? (
+          {canEmbed && embedFallback ? (
+            <iframe
+              className="absolute inset-0 h-full w-full border-0"
+              src={youtubeEmbedSrc}
+              title={video.title}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
+          ) : canEmbed ? (
             <div ref={wrapRef} className="absolute inset-0 h-full w-full" />
           ) : video.thumbnailUrl ? (
             <Image
@@ -360,6 +488,34 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
           ) : null}
         </div>
 
+        {canEmbed && embedFallback ? (
+          <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+            <span>
+              Playing the video with a simple embed (no segment jump). Use
+              Retry for the full player.
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setEmbedFallback(false);
+                setPlayerRetryKey((k) => k + 1);
+                setPlayerPhase("loading");
+              }}
+              className="font-semibold text-accent underline decoration-accent/50 underline-offset-2 hover:decoration-accent"
+            >
+              Retry interactive player
+            </button>
+            <a
+              href={youtubeWatchUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-accent underline decoration-accent/50 underline-offset-2"
+            >
+              Open on YouTube
+            </a>
+          </div>
+        ) : null}
+
         <h1 className="mb-2 text-xl font-semibold tracking-tight">
           {video.title}
         </h1>
@@ -376,7 +532,9 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
               : analysisBusy
                 ? "Generating summary & segments…"
                 : "Pending summary & segment analysis"
-            : "Click a segment to jump in the player"}
+            : embedFallback
+              ? "Video plays above; segment jump needs Retry (interactive player)"
+              : "Click a segment to jump in the player"}
         </p>
 
         {canEmbed ? (
@@ -449,6 +607,90 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
                   </div>
                 ) : null}
 
+                {analysis.hypeMoments.length > 0 ? (
+                  <div className="rounded-lg border border-fuchsia-500/30 bg-fuchsia-950/20 p-3">
+                    <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-fuchsia-200/95">
+                      Hype & peak moments
+                    </h3>
+                    <p className="mb-2.5 text-[11px] leading-snug text-muted">
+                      Drops, chorus hits, and big energy spikes—tap the underlined
+                      times to jump in the player.
+                    </p>
+                    <ul className="space-y-2">
+                      {analysis.hypeMoments.map((h, i) => {
+                        const active = i === activeHypeIdx;
+                        const canSeek = canJump;
+                        const endSec = h.endSec;
+                        return (
+                          <li key={i}>
+                            <div
+                              className={`rounded-md border-y border-r border-line border-l-4 border-l-fuchsia-500 py-2 pl-3 pr-2 text-left text-sm transition ${
+                                active
+                                  ? "bg-fuchsia-950/45 ring-2 ring-fuchsia-400/50 ring-offset-2 ring-offset-surface"
+                                  : ""
+                              }`}
+                            >
+                              <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1">
+                                <button
+                                  type="button"
+                                  disabled={!canSeek}
+                                  onClick={() => seekTo(h.startSec)}
+                                  className={`rounded px-1.5 py-0.5 text-left font-bold text-fuchsia-300 underline decoration-fuchsia-500/60 underline-offset-2 transition hover:bg-fuchsia-500/15 hover:decoration-fuchsia-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-fuchsia-400 ${
+                                    !canSeek
+                                      ? "cursor-not-allowed opacity-50 no-underline"
+                                      : "cursor-pointer"
+                                  }`}
+                                  title={
+                                    !canEmbed
+                                      ? "YouTube embed required"
+                                      : `Jump to ${formatSecondsAsMmSs(h.startSec)}`
+                                  }
+                                  aria-label={`Seek to ${formatSecondsAsMmSs(h.startSec)}`}
+                                >
+                                  {formatSecondsAsMmSs(h.startSec)}
+                                </button>
+                                {endSec !== undefined ? (
+                                  <>
+                                    <span
+                                      className="text-muted"
+                                      aria-hidden
+                                    >
+                                      –
+                                    </span>
+                                    <button
+                                      type="button"
+                                      disabled={!canSeek}
+                                      onClick={() => seekTo(endSec)}
+                                      className={`rounded px-1.5 py-0.5 text-left font-bold text-fuchsia-300 underline decoration-fuchsia-500/60 underline-offset-2 transition hover:bg-fuchsia-500/15 hover:decoration-fuchsia-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-fuchsia-400 ${
+                                        !canSeek
+                                          ? "cursor-not-allowed opacity-50 no-underline"
+                                          : "cursor-pointer"
+                                      }`}
+                                      title={
+                                        !canEmbed
+                                          ? "YouTube embed required"
+                                          : `Jump to ${formatSecondsAsMmSs(endSec)}`
+                                      }
+                                      aria-label={`Seek to ${formatSecondsAsMmSs(endSec)}`}
+                                    >
+                                      {formatSecondsAsMmSs(endSec)}
+                                    </button>
+                                  </>
+                                ) : null}
+                              </div>
+                              {h.label ? (
+                                <p className="mt-1.5 text-[13px] font-medium leading-snug text-foreground">
+                                  {h.label}
+                                </p>
+                              ) : null}
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ) : null}
+
                 {needsFictionSpoilerGate(
                   analysis.contentKind,
                   analysis.hasSpoilers,
@@ -503,9 +745,11 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
         </h2>
         {canEmbed ? (
           <p className="mb-3 text-[11px] text-muted">
-            {!playerReady
-              ? "Loading player…"
-              : "Tap a section to seek the video."}
+            {embedFallback
+              ? "Simple embed is active—segment seek needs Retry (interactive player)."
+              : playerPhase === "ready"
+                ? "Tap a section to seek the video."
+                : "Loading player…"}
           </p>
         ) : null}
 
@@ -515,7 +759,7 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
               ? "Transcribing or reading captions, then generating summary…"
               : analysisError
                 ? segmentAnalysisBlockedReason(analysisError)
-                : "No segments yet. For real videos, run analysis (captions if available; else AI transcription needs GEMINI_API_KEY; summary step needs FAL_KEY)."}
+                : "No segments yet. For real videos, run analysis (FAL_KEY required; captions if available, else AI transcription via FAL or optional GEMINI_API_KEY)."}
           </p>
         ) : (
           <ul className="space-y-2">
@@ -538,11 +782,15 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
                     title={
                       !canEmbed
                         ? "Requires a YouTube embed"
-                        : !playerReady
-                          ? "Player loading"
-                          : sec === null
-                            ? "Invalid timestamp"
-                            : `Jump to ${seg.startLabel}`
+                        : embedFallback
+                          ? "Retry interactive player to enable seek"
+                          : !playerReady
+                            ? playerPhase === "loading"
+                              ? "Player loading"
+                              : "Seek unavailable until the player loads"
+                            : sec === null
+                              ? "Invalid timestamp"
+                              : `Jump to ${seg.startLabel}`
                     }
                   >
                     <div className="mb-1.5 space-y-1.5">

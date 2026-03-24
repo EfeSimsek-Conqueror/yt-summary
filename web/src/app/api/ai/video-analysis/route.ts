@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { analyzeTranscriptWithGeminiFlash } from "@/lib/ai/analyze-transcript";
 import { getFalKey } from "@/lib/ai/fal-openai";
-import { getGeminiApiKey } from "@/lib/ai/gemini-api-key";
 import { transcribeYoutubeVideoWithGemini } from "@/lib/ai/transcribe-youtube-video";
 import { createClient } from "@/lib/supabase/server";
 import { parseYoutubeVideoId } from "@/lib/youtube/video-id";
@@ -113,15 +112,6 @@ export async function POST(request: NextRequest) {
       }
       forModel = timed;
     } else {
-      if (!getGeminiApiKey()) {
-        return NextResponse.json(
-          {
-            error:
-              "GEMINI_API_KEY is not configured on the server (required when YouTube captions are unavailable).",
-          },
-          { status: 503 },
-        );
-      }
       const id = parseYoutubeVideoId(parsed.data.videoId);
       if (!id) {
         return NextResponse.json(
@@ -154,6 +144,7 @@ export async function POST(request: NextRequest) {
       revelations: analysis.revelations,
       keyPoints: analysis.key_points,
       segments: analysis.segments,
+      hypeMoments: analysis.hype_moments,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Analysis failed";

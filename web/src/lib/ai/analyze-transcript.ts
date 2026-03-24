@@ -22,11 +22,66 @@ const contentKindSchema = z.enum([
   "podcast",
   "vlog",
   "review",
+  "music",
   "other",
 ]);
 
+type ContentKind = z.infer<typeof contentKindSchema>;
+
+/** Maps model drift (wrong casing, synonyms) to a valid content_kind. */
+function normalizeContentKind(value: unknown): ContentKind {
+  if (typeof value !== "string") {
+    return "other";
+  }
+  const raw = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  const direct = contentKindSchema.safeParse(raw);
+  if (direct.success) {
+    return direct.data;
+  }
+  const aliases: Record<string, ContentKind> = {
+    tv: "tv_episode",
+    television: "tv_episode",
+    series: "tv_episode",
+    episode: "tv_episode",
+    movie: "film_recap",
+    film: "film_recap",
+    cinema: "film_recap",
+    documentary: "news",
+    doc: "news",
+    report: "news",
+    interview: "podcast",
+    debate: "podcast",
+    lecture: "tutorial",
+    educational: "tutorial",
+    howto: "tutorial",
+    how_to: "tutorial",
+    gaming: "vlog",
+    gameplay: "vlog",
+    stream: "vlog",
+    mv: "music",
+    music_video: "music",
+    song: "music",
+    lyric: "music",
+    lyrics: "music",
+    performance: "music",
+    live_music: "music",
+    concert: "music",
+    music: "music",
+    sports: "other",
+    comedy: "other",
+    entertainment: "other",
+    animation: "fiction_other",
+    anime: "fiction_other",
+    story: "fiction_other",
+  };
+  return aliases[raw] ?? "other";
+}
+
 const analysisSchema = z.object({
-  content_kind: contentKindSchema,
+  content_kind: z.preprocess(
+    (v) => normalizeContentKind(v),
+    contentKindSchema,
+  ),
   /** True if plot twists, endings, episode surprises, or major story reveals are discussed */
   has_spoilers: z.boolean(),
   summary_short: z.string().min(1).max(400),
@@ -46,6 +101,30 @@ const analysisSchema = z.object({
     z.array(z.string()).max(15),
   ),
   segments: z.array(segmentSchema).max(10),
+  /**
+   * Music videos / performances: timestamps where energy peaks (drops, chorus hits,
+   * build-ups that explode, big instrumental hits). Empty for non-music.
+   */
+  hype_moments: z.preprocess(
+    (v) => (Array.isArray(v) ? v : []),
+    z
+      .array(
+        z
+          .object({
+            start_sec: z.coerce.number().nonnegative(),
+            end_sec: z.coerce.number().nonnegative().optional(),
+            label: z.string().max(120).optional(),
+          })
+          .transform((h) => {
+            const end =
+              h.end_sec !== undefined && h.end_sec >= h.start_sec
+                ? h.end_sec
+                : undefined;
+            return { start_sec: h.start_sec, end_sec: end, label: h.label };
+          }),
+      )
+      .max(12),
+  ),
 });
 
 export type TranscriptAnalysis = z.infer<typeof analysisSchema>;
@@ -69,11 +148,15 @@ Return ONLY raw JSON (no markdown code fences, no commentary) with this exact sh
       "mood": "educational",
       "bullets": ["Key idea", "Another point"]
     }
+  ],
+  "hype_moments": [
+    { "start_sec": 45.2, "end_sec": 52.0, "label": "Beat drop / chorus hit" }
   ]
 }
 
 Rules:
-- content_kind: Pick the best fit. Use tv_episode for series episodes; film_recap for movies; fiction_other for stories/animation not clearly TV or film; tutorial/news/podcast/vlog/review/other as appropriate.
+- content_kind: Pick the best fit. Use music for MVs, official audio, lyric videos, live song performances, concerts. Use tv_episode for series episodes; film_recap for movies; fiction_other for stories/animation not clearly TV or film; tutorial/news/podcast/vlog/review/other as appropriate.
+- hype_moments: REQUIRED array (use [] if not a music-focused video). For content_kind music (or clear song/MV content): list 3–12 moments where the track or video energy spikes—beat drops, chorus or hook entries, big instrumental hits, build-ups that “explode”, climax sections, or obvious visual sync peaks. Each item needs start_sec (seconds from video start). Optionally end_sec if the moment is a short window. label: very short (e.g. “Drop”, “Chorus”, “Bridge build”, “Final chorus”). Estimate times from lyrics/transcript pacing and structure if exact timestamps are unclear; order chronologically. For non-music videos, use [].
 - has_spoilers: true if the video reveals plot, endings, twists, killer identity, who dies, finale details, or comparable spoilers. false for generic non-fiction with no such reveals.
 - summary_detailed: REQUIRED. Length ~200–280 words (about 250). Same language as the transcript when possible. NOT a transcript dump—no long quotes. For tv_episode / film_recap / fiction_other: write as a clear recap (“This happens, then…”, who does what). For tutorial/news/podcast: structured explanation with main ideas; you may still use short paragraphs. Do not pad with filler.
 - revelations: Each item ONE short sentence for a twist, secret, ending reveal, or “what you need to know” spoiler. Use [] if none. Do not repeat summary_detailed verbatim—extract the punchiest reveals.

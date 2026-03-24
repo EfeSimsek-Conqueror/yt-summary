@@ -1,0 +1,9 @@
+# Railway: set this folder as the service Root Directory in the dashboard,
+# or deploy from the `web` directory (linked service).
+[build]
+builder = "nixpacks"
+
+[deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
