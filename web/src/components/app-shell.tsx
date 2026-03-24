@@ -9,6 +9,8 @@ type Props = {
   suppressSidebarActive?: boolean;
   /** When false, sidebar + main are blurred and a centered login prompt is shown. */
   isAuthenticated?: boolean;
+  /** When false, the subscriptions column is hidden (e.g. video page with its own layout). */
+  subscriptionSidebar?: boolean;
   children: React.ReactNode;
 };
 
@@ -17,12 +19,13 @@ export function AppShell({
   activeChannelId,
   suppressSidebarActive = false,
   isAuthenticated = true,
+  subscriptionSidebar = true,
   children,
 }: Props) {
   const showGuestGate = !isAuthenticated;
 
   return (
-    <div className="flex min-h-screen flex-col bg-canvas">
+    <div className="flex min-h-screen flex-col bg-black text-white">
       <TopNav />
       <div className="relative flex min-h-0 flex-1">
         <div
@@ -33,11 +36,13 @@ export function AppShell({
           }
           aria-hidden={showGuestGate}
         >
-          <SubscriptionSidebar
-            channels={channels}
-            activeChannelId={activeChannelId}
-            suppressActiveChannel={suppressSidebarActive}
-          />
+          {subscriptionSidebar ? (
+            <SubscriptionSidebar
+              channels={channels}
+              activeChannelId={activeChannelId}
+              suppressActiveChannel={suppressSidebarActive}
+            />
+          ) : null}
           <div className="min-w-0 flex-1 overflow-auto">{children}</div>
         </div>
         {showGuestGate ? <GuestLoginOverlay /> : null}

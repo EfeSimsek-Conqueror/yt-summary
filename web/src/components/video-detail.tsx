@@ -14,14 +14,14 @@ export function VideoDetail({ video }: Props) {
 
   const backHref =
     video.channelId && video.channelId.length > 0
-      ? `/?channel=${encodeURIComponent(video.channelId)}`
-      : "/";
+      ? `/dashboard?channel=${encodeURIComponent(video.channelId)}`
+      : "/dashboard";
 
   return (
     <main className="p-6 px-7 lg:p-7">
       <Link
         href={backHref}
-        className="mb-6 inline-block text-sm text-muted hover:text-accent"
+        className="mb-6 inline-flex items-center gap-2 text-sm text-gray-400 transition hover:text-white"
       >
         ← Back to channel
       </Link>

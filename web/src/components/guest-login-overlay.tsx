@@ -10,14 +10,14 @@ export function GuestLoginOverlay() {
       aria-modal="true"
       aria-labelledby="guest-login-title"
     >
-      <div className="pointer-events-auto max-w-sm rounded-2xl border border-line bg-surface/95 px-8 py-8 text-center shadow-xl backdrop-blur-md">
+      <div className="pointer-events-auto max-w-sm rounded-2xl border border-gray-800 bg-zinc-950/95 px-8 py-8 text-center shadow-xl backdrop-blur-md">
         <h2
           id="guest-login-title"
-          className="text-xl font-semibold tracking-tight text-[var(--text)]"
+          className="text-xl font-semibold tracking-tight text-white"
         >
           Log in
         </h2>
-        <p className="mt-2 text-sm text-muted">
+        <p className="mt-2 text-sm text-gray-400">
           Sign in with Google to view your subscriptions and analyze videos.
         </p>
         <button
@@ -27,7 +27,7 @@ export function GuestLoginOverlay() {
               `${window.location.pathname}${window.location.search}`,
             )
           }
-          className="mt-6 w-full rounded-lg border border-line bg-raised px-4 py-2.5 text-sm font-medium text-[var(--text)] transition hover:bg-surface"
+          className="mt-6 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700"
         >
           Sign in with Google
         </button>

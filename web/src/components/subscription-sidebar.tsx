@@ -16,7 +16,7 @@ export function SubscriptionSidebar({
 }: Props) {
   return (
     <aside
-      className="w-[280px] shrink-0 border-r border-line bg-surface py-4 pl-3 pr-2"
+      className="w-[280px] shrink-0 border-r border-gray-800 bg-zinc-950 py-4 pl-3 pr-2"
       aria-label="Subscriptions"
     >
       <div className="px-3 pb-3 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted">
@@ -34,11 +34,11 @@ export function SubscriptionSidebar({
             return (
               <Link
                 key={ch.id}
-                href={`/?channel=${encodeURIComponent(ch.id)}`}
+                href={`/dashboard?channel=${encodeURIComponent(ch.id)}`}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                   active
-                    ? "bg-accent/15 outline outline-1 outline-accent/35"
-                    : "hover:bg-raised"
+                    ? "bg-blue-600/15 outline outline-1 outline-blue-500/40"
+                    : "hover:bg-zinc-900"
                 }`}
               >
                 {ch.thumbnailUrl ? (

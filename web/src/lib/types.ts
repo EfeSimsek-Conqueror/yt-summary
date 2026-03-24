@@ -33,3 +33,33 @@ export type Video = {
   /** Channel display name from YouTube snippet (when not in mock catalog) */
   channelTitle?: string;
 };
+
+/** AI video analysis payload (client-side state + API response shape) */
+export type AnalysisContentKind =
+  | "tv_episode"
+  | "film_recap"
+  | "fiction_other"
+  | "tutorial"
+  | "news"
+  | "podcast"
+  | "vlog"
+  | "review"
+  | "music"
+  | "other";
+
+export type AnalysisHypeMoment = {
+  startSec: number;
+  endSec?: number;
+  label?: string;
+};
+
+export type AnalysisPayload = {
+  contentKind: AnalysisContentKind;
+  hasSpoilers: boolean;
+  summaryDetailed: string;
+  summaryShort: string;
+  revelations: string[];
+  keyPoints: string[];
+  segments: Segment[];
+  hypeMoments: AnalysisHypeMoment[];
+};

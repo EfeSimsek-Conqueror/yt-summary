@@ -3,15 +3,22 @@
 /// <reference types="youtube" />
 
 import Image from "next/image";
+import { ThumbsUp } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Segment, Video } from "@/lib/types";
+import { YoutubeIframePlayer } from "@/components/youtube-iframe-player";
+import { YoutubeSummaryTakeawaysPanel } from "@/components/youtube-summary-takeaways-panel";
+import type {
+  AnalysisHypeMoment,
+  AnalysisPayload,
+  Segment,
+  Video,
+} from "@/lib/types";
 import {
   MOOD_LABELS,
   moodVisuals,
   normalizeSegmentMood,
 } from "@/lib/segment-mood";
 import { formatSecondsAsMmSs, segmentStartSeconds } from "@/lib/segment-time";
-import { ensureYoutubeIframeApi } from "@/lib/youtube/iframe-api";
 import { isLikelyYoutubeVideoId } from "@/lib/youtube/video-id";
 
 const thumbGradients = [
@@ -55,17 +62,7 @@ type Props = {
   channelLabel: string;
 };
 
-type ContentKind =
-  | "tv_episode"
-  | "film_recap"
-  | "fiction_other"
-  | "tutorial"
-  | "news"
-  | "podcast"
-  | "vlog"
-  | "review"
-  | "music"
-  | "other";
+type ContentKind = AnalysisPayload["contentKind"];
 
 const CONTENT_KINDS = new Set<string>([
   "tv_episode",
@@ -97,23 +94,6 @@ function needsFictionSpoilerGate(
   return hasSpoilers && FICTION_SPOILER_KINDS.includes(kind);
 }
 
-type HypeMoment = {
-  startSec: number;
-  endSec?: number;
-  label?: string;
-};
-
-type AnalysisPayload = {
-  contentKind: ContentKind;
-  hasSpoilers: boolean;
-  summaryDetailed: string;
-  summaryShort: string;
-  revelations: string[];
-  keyPoints: string[];
-  segments: Segment[];
-  hypeMoments: HypeMoment[];
-};
-
 type ApiSegment = {
   start_sec: number;
   end_sec: number;
@@ -123,11 +103,11 @@ type ApiSegment = {
   bullets: string[];
 };
 
-function mapApiHypeMoments(rows: unknown): HypeMoment[] {
+function mapApiHypeMoments(rows: unknown): AnalysisHypeMoment[] {
   if (!Array.isArray(rows)) {
     return [];
   }
-  const out: HypeMoment[] = [];
+  const out: AnalysisHypeMoment[] = [];
   for (const row of rows) {
     if (!row || typeof row !== "object") continue;
     const o = row as Record<string, unknown>;
@@ -177,11 +157,7 @@ function mapApiSegments(rows: ApiSegment[]): Segment[] {
   });
 }
 
-/** Slow networks + dev Strict Mode can delay `onReady`; avoid false “slow” too early. */
-const PLAYER_ON_READY_MS = 45_000;
-
 export function YoutubeWatchLayout({ video, channelLabel }: Props) {
-  const wrapRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YT.Player | null>(null);
   /** loading = waiting for API or onReady; ready = can seek; error/timeout = embed failed or stuck */
   const [playerPhase, setPlayerPhase] = useState<
@@ -200,6 +176,11 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
    * so the video still plays (segment seek needs the API player).
    */
   const [embedFallback, setEmbedFallback] = useState(false);
+  const [topComments, setTopComments] = useState<
+    Array<{ author: string; text: string; likeCount: number }>
+  >([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsError, setCommentsError] = useState<string | null>(null);
 
   const canEmbed = isLikelyYoutubeVideoId(video.id);
 
@@ -210,6 +191,9 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
     setSpoilersRevealed(false);
     setPlayerRetryKey(0);
     setEmbedFallback(false);
+    setPlayerPhase("loading");
+    setPlayhead(0);
+    playerRef.current = null;
   }, [video.id]);
 
   const segments = analysis?.segments ?? video.segments;
@@ -228,92 +212,6 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
     sec: segmentStartSeconds(seg),
     seg,
   }));
-
-  useEffect(() => {
-    if (!canEmbed || embedFallback) return;
-    if (!wrapRef.current) return;
-
-    const el = wrapRef.current;
-    const elId = `yt-embed-${video.id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
-    el.id = elId;
-
-    let cancelled = false;
-    let ytPlayer: YT.Player | null = null;
-    let onReadyTimeoutId: ReturnType<typeof setTimeout> | undefined;
-
-    setPlayerPhase("loading");
-
-    void ensureYoutubeIframeApi()
-      .then(() => {
-        if (cancelled || !document.getElementById(elId)) return;
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            if (cancelled || !document.getElementById(elId)) return;
-            onReadyTimeoutId = setTimeout(() => {
-              if (!cancelled) {
-                setPlayerPhase((p) => (p === "loading" ? "timeout" : p));
-                setEmbedFallback(true);
-              }
-            }, PLAYER_ON_READY_MS);
-
-            ytPlayer = new YT.Player(elId, {
-              videoId: video.id,
-              width: "100%",
-              height: "100%",
-              playerVars: {
-                enablejsapi: 1,
-                origin:
-                  typeof window !== "undefined"
-                    ? window.location.origin
-                    : undefined,
-                rel: 0,
-                modestbranding: 1,
-                playsinline: 1,
-              },
-              events: {
-                onReady: (e) => {
-                  if (cancelled) return;
-                  if (onReadyTimeoutId !== undefined) {
-                    clearTimeout(onReadyTimeoutId);
-                    onReadyTimeoutId = undefined;
-                  }
-                  playerRef.current = e.target;
-                  setPlayerPhase("ready");
-                },
-                onError: () => {
-                  if (cancelled) return;
-                  if (onReadyTimeoutId !== undefined) {
-                    clearTimeout(onReadyTimeoutId);
-                    onReadyTimeoutId = undefined;
-                  }
-                  setPlayerPhase("error");
-                  setEmbedFallback(true);
-                },
-              },
-            });
-          });
-        });
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setPlayerPhase("error");
-          setEmbedFallback(true);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-      if (onReadyTimeoutId !== undefined) {
-        clearTimeout(onReadyTimeoutId);
-      }
-      try {
-        ytPlayer?.destroy();
-      } catch {
-        /* ignore */
-      }
-      playerRef.current = null;
-    };
-  }, [video.id, canEmbed, playerRetryKey, embedFallback]);
 
   useEffect(() => {
     if (!playerReady) return;
@@ -420,6 +318,57 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
     return () => ac.abort();
   }, [canEmbed, video.id, runVideoAnalysis]);
 
+  useEffect(() => {
+    if (!canEmbed) {
+      setTopComments([]);
+      setCommentsError(null);
+      setCommentsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setCommentsLoading(true);
+    setCommentsError(null);
+    fetch(`/api/youtube/video-comments?videoId=${encodeURIComponent(video.id)}`)
+      .then((r) => r.json())
+      .then(
+        (data: {
+          comments?: Array<{
+            author?: string;
+            text?: string;
+            likeCount?: number;
+          }>;
+          error?: string | null;
+        }) => {
+          if (cancelled) return;
+          const raw = Array.isArray(data.comments) ? data.comments : [];
+          const comments = raw
+            .filter(
+              (c): c is { author: string; text: string; likeCount: number } =>
+                !!c &&
+                typeof c.author === "string" &&
+                typeof c.text === "string" &&
+                typeof c.likeCount === "number",
+            )
+            .slice(0, 10);
+          setTopComments(comments);
+          setCommentsError(
+            typeof data.error === "string" && data.error
+              ? data.error
+              : null,
+          );
+        },
+      )
+      .catch(() => {
+        if (!cancelled) setCommentsError("Could not load comments");
+      })
+      .finally(() => {
+        if (!cancelled) setCommentsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canEmbed, video.id]);
+
   let activeSegmentIdx = -1;
   let bestSec = -Infinity;
   for (const { idx, sec } of segmentTimes) {
@@ -450,294 +399,9 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
   const youtubeEmbedSrc = `https://www.youtube.com/embed/${encodeURIComponent(video.id)}?rel=0&modestbranding=1&playsinline=1`;
 
   return (
-    <div className="grid gap-7 lg:grid-cols-[1fr_380px] lg:items-start">
-      <div>
-        <div
-          className={
-            canEmbed
-              ? "relative mb-4 aspect-video overflow-hidden rounded-xl border border-line bg-black"
-              : video.thumbnailUrl
-                ? "relative mb-4 aspect-video overflow-hidden rounded-xl border border-line"
-                : `relative mb-4 aspect-video overflow-hidden rounded-xl border border-line bg-gradient-to-br ${thumbClass(video.id)}`
-          }
-        >
-          {canEmbed && embedFallback ? (
-            <iframe
-              className="absolute inset-0 h-full w-full border-0"
-              src={youtubeEmbedSrc}
-              title={video.title}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-            />
-          ) : canEmbed ? (
-            <div ref={wrapRef} className="absolute inset-0 h-full w-full" />
-          ) : video.thumbnailUrl ? (
-            <Image
-              src={video.thumbnailUrl}
-              alt=""
-              fill
-              className="object-cover"
-              sizes="(max-width: 1024px) 100vw, 60vw"
-            />
-          ) : null}
-          {!canEmbed ? (
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 pt-10 text-center text-[11px] text-white/80">
-              Embed and chapter jump are available for real YouTube video IDs from
-              your feed. This page uses a sample entry without a player.
-            </div>
-          ) : null}
-        </div>
-
-        {canEmbed && embedFallback ? (
-          <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-            <span>
-              Playing the video with a simple embed (no segment jump). Use
-              Retry for the full player.
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                setEmbedFallback(false);
-                setPlayerRetryKey((k) => k + 1);
-                setPlayerPhase("loading");
-              }}
-              className="font-semibold text-accent underline decoration-accent/50 underline-offset-2 hover:decoration-accent"
-            >
-              Retry interactive player
-            </button>
-            <a
-              href={youtubeWatchUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold text-accent underline decoration-accent/50 underline-offset-2"
-            >
-              Open on YouTube
-            </a>
-          </div>
-        ) : null}
-
-        <h1 className="mb-2 text-xl font-semibold tracking-tight">
-          {video.title}
-        </h1>
-        {summaryShort ? (
-          <p className="mb-3 text-sm leading-relaxed text-muted">
-            {summaryShort}
-          </p>
-        ) : null}
-        <p className="mb-3 text-sm text-muted">
-          {channelLabel} · {video.durationLabel} ·{" "}
-          {segments.length === 0
-            ? analysisError
-              ? "Summary unavailable (see error below)"
-              : analysisBusy
-                ? "Generating summary & segments…"
-                : "Pending summary & segment analysis"
-            : embedFallback
-              ? "Video plays above; segment jump needs Retry (interactive player)"
-              : "Click a segment to jump in the player"}
-        </p>
-
-        {canEmbed ? (
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              disabled={analysisBusy}
-              onClick={() => void runVideoAnalysis()}
-              className="rounded-lg border border-line bg-raised px-3 py-2 text-sm font-medium text-foreground transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {analysisBusy
-                ? "Running analysis…"
-                : analysis
-                  ? "Run analysis again"
-                  : "Run analysis"}
-            </button>
-            {analysisError ? (
-              <span className="text-sm text-red-600 dark:text-red-400">
-                {analysisError}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-
-        <div className="rounded-xl border border-line bg-surface p-4">
-          <h2 className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-muted">
-            {canEmbed ? "Summary & takeaways" : "Transcript preview"}
-          </h2>
-          <div
-            className={`relative text-sm leading-relaxed ${
-              summaryPanelScrollable
-                ? "max-h-[min(420px,55vh)] overflow-y-auto pr-1"
-                : "max-h-[140px] overflow-hidden"
-            }`}
-          >
-            {!analysis ? (
-              <>
-                <p className="whitespace-pre-wrap text-muted">
-                  {preAnalysisHint}
-                </p>
-                {!summaryPanelScrollable ? (
-                  <div
-                    className="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-surface to-transparent"
-                    aria-hidden
-                  />
-                ) : null}
-              </>
-            ) : (
-              <div className="space-y-4 text-muted">
-                {analysis.hasSpoilers &&
-                !needsFictionSpoilerGate(
-                  analysis.contentKind,
-                  analysis.hasSpoilers,
-                ) ? (
-                  <p className="rounded-md border border-amber-500/35 bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-100/95">
-                    May contain spoilers for story or gameplay reveals.
-                  </p>
-                ) : null}
-
-                {analysis.keyPoints.length > 0 ? (
-                  <div>
-                    <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                      Key points
-                    </h3>
-                    <ul className="list-disc space-y-1.5 pl-5">
-                      {analysis.keyPoints.map((k, i) => (
-                        <li key={i}>{k}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-
-                {analysis.hypeMoments.length > 0 ? (
-                  <div className="rounded-lg border border-fuchsia-500/30 bg-fuchsia-950/20 p-3">
-                    <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-fuchsia-200/95">
-                      Hype & peak moments
-                    </h3>
-                    <p className="mb-2.5 text-[11px] leading-snug text-muted">
-                      Drops, chorus hits, and big energy spikes—tap the underlined
-                      times to jump in the player.
-                    </p>
-                    <ul className="space-y-2">
-                      {analysis.hypeMoments.map((h, i) => {
-                        const active = i === activeHypeIdx;
-                        const canSeek = canJump;
-                        const endSec = h.endSec;
-                        return (
-                          <li key={i}>
-                            <div
-                              className={`rounded-md border-y border-r border-line border-l-4 border-l-fuchsia-500 py-2 pl-3 pr-2 text-left text-sm transition ${
-                                active
-                                  ? "bg-fuchsia-950/45 ring-2 ring-fuchsia-400/50 ring-offset-2 ring-offset-surface"
-                                  : ""
-                              }`}
-                            >
-                              <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1">
-                                <button
-                                  type="button"
-                                  disabled={!canSeek}
-                                  onClick={() => seekTo(h.startSec)}
-                                  className={`rounded px-1.5 py-0.5 text-left font-bold text-fuchsia-300 underline decoration-fuchsia-500/60 underline-offset-2 transition hover:bg-fuchsia-500/15 hover:decoration-fuchsia-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-fuchsia-400 ${
-                                    !canSeek
-                                      ? "cursor-not-allowed opacity-50 no-underline"
-                                      : "cursor-pointer"
-                                  }`}
-                                  title={
-                                    !canEmbed
-                                      ? "YouTube embed required"
-                                      : `Jump to ${formatSecondsAsMmSs(h.startSec)}`
-                                  }
-                                  aria-label={`Seek to ${formatSecondsAsMmSs(h.startSec)}`}
-                                >
-                                  {formatSecondsAsMmSs(h.startSec)}
-                                </button>
-                                {endSec !== undefined ? (
-                                  <>
-                                    <span
-                                      className="text-muted"
-                                      aria-hidden
-                                    >
-                                      –
-                                    </span>
-                                    <button
-                                      type="button"
-                                      disabled={!canSeek}
-                                      onClick={() => seekTo(endSec)}
-                                      className={`rounded px-1.5 py-0.5 text-left font-bold text-fuchsia-300 underline decoration-fuchsia-500/60 underline-offset-2 transition hover:bg-fuchsia-500/15 hover:decoration-fuchsia-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-fuchsia-400 ${
-                                        !canSeek
-                                          ? "cursor-not-allowed opacity-50 no-underline"
-                                          : "cursor-pointer"
-                                      }`}
-                                      title={
-                                        !canEmbed
-                                          ? "YouTube embed required"
-                                          : `Jump to ${formatSecondsAsMmSs(endSec)}`
-                                      }
-                                      aria-label={`Seek to ${formatSecondsAsMmSs(endSec)}`}
-                                    >
-                                      {formatSecondsAsMmSs(endSec)}
-                                    </button>
-                                  </>
-                                ) : null}
-                              </div>
-                              {h.label ? (
-                                <p className="mt-1.5 text-[13px] font-medium leading-snug text-foreground">
-                                  {h.label}
-                                </p>
-                              ) : null}
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                ) : null}
-
-                {needsFictionSpoilerGate(
-                  analysis.contentKind,
-                  analysis.hasSpoilers,
-                ) && !spoilersRevealed ? (
-                  <div className="rounded-lg border border-amber-500/45 bg-amber-950/35 p-4">
-                    <p className="mb-1 text-sm font-semibold text-amber-100">
-                      Spoilers ahead
-                    </p>
-                    <p className="mb-4 text-xs leading-relaxed text-amber-100/88">
-                      This looks like a TV, film, or fiction recap. The full
-                      summary and revelation list can spoil twists and endings.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setSpoilersRevealed(true)}
-                      className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-500"
-                    >
-                      Show summary & spoilers
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <p className="whitespace-pre-wrap">
-                      {analysis.summaryDetailed}
-                    </p>
-                    {analysis.revelations.length > 0 ? (
-                      <div className="border-t border-line pt-4">
-                        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                          Spoilers & revelations
-                        </h3>
-                        <ul className="list-disc space-y-1.5 pl-5">
-                          {analysis.revelations.map((r, i) => (
-                            <li key={i}>{r}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : null}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div
-        className="rounded-xl border border-line bg-surface p-4"
+    <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)_380px] lg:items-start">
+      <aside
+        className="order-2 min-w-0 rounded-xl border border-line bg-surface p-4 lg:sticky lg:top-16 lg:order-none lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto"
         aria-label="Segment analysis"
       >
         <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
@@ -837,7 +501,196 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
             })}
           </ul>
         )}
+      </aside>
+
+      <div className="order-1 min-w-0 space-y-6 lg:order-none">
+        <div className="min-w-0 space-y-3">
+        <div
+          className={
+            canEmbed
+              ? "relative aspect-video overflow-hidden rounded-xl border border-line bg-black"
+              : video.thumbnailUrl
+                ? "relative aspect-video overflow-hidden rounded-xl border border-line"
+                : `relative aspect-video overflow-hidden rounded-xl border border-line bg-gradient-to-br ${thumbClass(video.id)}`
+          }
+        >
+          {canEmbed && embedFallback ? (
+            <iframe
+              className="absolute inset-0 h-full w-full border-0"
+              src={youtubeEmbedSrc}
+              title={video.title}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
+          ) : canEmbed ? (
+            <YoutubeIframePlayer
+              videoId={video.id}
+              retryKey={playerRetryKey}
+              onReady={(p) => {
+                playerRef.current = p;
+                setPlayerPhase("ready");
+              }}
+              onTimeout={() => {
+                setPlayerPhase((prev) =>
+                  prev === "loading" ? "timeout" : prev,
+                );
+                setEmbedFallback(true);
+              }}
+              onError={() => {
+                setPlayerPhase("error");
+                setEmbedFallback(true);
+              }}
+            />
+          ) : video.thumbnailUrl ? (
+            <Image
+              src={video.thumbnailUrl}
+              alt=""
+              fill
+              className="object-cover"
+              sizes="(max-width: 1024px) 100vw, 60vw"
+            />
+          ) : null}
+          {!canEmbed ? (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 pt-10 text-center text-[11px] text-white/80">
+              Embed and chapter jump are available for real YouTube video IDs from
+              your feed. This page uses a sample entry without a player.
+            </div>
+          ) : null}
+        </div>
+
+        {canEmbed && embedFallback ? (
+          <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+            <span>
+              Playing the video with a simple embed (no segment jump). Use
+              Retry for the full player.
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setEmbedFallback(false);
+                setPlayerRetryKey((k) => k + 1);
+                setPlayerPhase("loading");
+              }}
+              className="font-semibold text-accent underline decoration-accent/50 underline-offset-2 hover:decoration-accent"
+            >
+              Retry interactive player
+            </button>
+            <a
+              href={youtubeWatchUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-accent underline decoration-accent/50 underline-offset-2"
+            >
+              Open on YouTube
+            </a>
+          </div>
+        ) : null}
+        </div>
+
+        <h1 className="mb-2 text-xl font-semibold tracking-tight">
+          {video.title}
+        </h1>
+        {summaryShort ? (
+          <p className="mb-3 text-sm leading-relaxed text-muted">
+            {summaryShort}
+          </p>
+        ) : null}
+        <p className="mb-3 text-sm text-muted">
+          {channelLabel} · {video.durationLabel} ·{" "}
+          {segments.length === 0
+            ? analysisError
+              ? "Summary unavailable (see error below)"
+              : analysisBusy
+                ? "Generating summary & segments…"
+                : "Pending summary & segment analysis"
+            : embedFallback
+              ? "Video plays above; segment jump needs Retry (interactive player)"
+              : "Click a segment to jump in the player"}
+        </p>
+
+        {canEmbed ? (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={analysisBusy}
+              onClick={() => void runVideoAnalysis()}
+              className="rounded-lg border border-line bg-raised px-3 py-2 text-sm font-medium text-foreground transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {analysisBusy
+                ? "Running analysis…"
+                : analysis
+                  ? "Run analysis again"
+                  : "Run analysis"}
+            </button>
+            {analysisError ? (
+              <span className="text-sm text-red-600 dark:text-red-400">
+                {analysisError}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="rounded-xl border border-line bg-surface p-4">
+          <h2 className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-muted">
+            Top comments by likes
+          </h2>
+          {!canEmbed ? (
+            <p className="text-sm text-muted">
+              Comments appear for real YouTube videos when the Data API key is
+              set.
+            </p>
+          ) : commentsLoading ? (
+            <p className="text-sm text-muted">Loading comments…</p>
+          ) : topComments.length === 0 ? (
+            <p className="text-sm text-muted">
+              {commentsError ??
+                "No comments loaded (comments disabled, API quota, or add YOUTUBE_DATA_API_KEY in .env.local—this is separate from GEMINI_API_KEY)."}
+            </p>
+          ) : (
+            <ol className="space-y-4">
+              {topComments.map((c, i) => (
+                <li
+                  key={`${c.author}-${i}`}
+                  className="border-b border-line pb-4 last:border-0 last:pb-0"
+                >
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="font-semibold text-foreground">
+                      {c.author}
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-md bg-zinc-800/90 px-2 py-0.5 text-muted">
+                      <ThumbsUp className="h-3 w-3 shrink-0" aria-hidden />
+                      {c.likeCount.toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted">
+                    {c.text}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
       </div>
+
+      <aside
+        className="order-3 min-w-0 rounded-xl border border-line bg-surface p-4 lg:sticky lg:top-16 lg:order-none lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto"
+        aria-label="Summary and takeaways"
+      >
+        <YoutubeSummaryTakeawaysPanel
+          canEmbed={canEmbed}
+          analysis={analysis}
+          preAnalysisHint={preAnalysisHint}
+          summaryPanelScrollable={summaryPanelScrollable}
+          spoilersRevealed={spoilersRevealed}
+          onRevealSpoilers={() => setSpoilersRevealed(true)}
+          activeHypeIdx={activeHypeIdx}
+          canJump={canJump}
+          canSeekEmbed={canEmbed}
+          seekTo={seekTo}
+          formatSecondsAsMmSs={formatSecondsAsMmSs}
+          needsFictionSpoilerGate={needsFictionSpoilerGate}
+        />
+      </aside>
     </div>
   );
 }

@@ -16,6 +16,15 @@ export default {
         muted: "var(--text-muted)",
         accent: "var(--accent)",
       },
+      keyframes: {
+        "landing-marquee": {
+          "0%": { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-50%)" },
+        },
+      },
+      animation: {
+        "landing-marquee": "landing-marquee 50s linear infinite",
+      },
     },
   },
   plugins: [],

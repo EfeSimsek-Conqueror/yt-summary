@@ -28,11 +28,12 @@ export function AuthControls() {
     const supabase = createClient();
     await supabase.auth.signOut();
     setUser(null);
+    window.location.href = "/";
   }
 
   if (user === "pending") {
     return (
-      <div className="h-9 w-9 rounded-full border border-line bg-raised" />
+      <div className="h-9 w-9 rounded-full border border-gray-700 bg-zinc-900" />
     );
   }
 
@@ -45,7 +46,7 @@ export function AuthControls() {
             `${window.location.pathname}${window.location.search}`,
           ).catch(() => {})
         }
-        className="rounded-lg border border-line bg-raised px-3 py-1.5 text-xs font-medium text-[var(--text)] transition hover:bg-surface"
+        className="rounded-lg border border-gray-700 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-zinc-800"
       >
         Sign in with Google
       </button>
@@ -54,13 +55,13 @@ export function AuthControls() {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="hidden max-w-[140px] truncate text-xs text-muted sm:inline">
+      <span className="hidden max-w-[160px] truncate text-xs text-gray-400 sm:inline">
         {user.email ?? user.user_metadata?.full_name ?? "Account"}
       </span>
       <button
         type="button"
         onClick={() => void signOut()}
-        className="rounded-lg px-2 py-1 text-xs text-muted hover:bg-raised hover:text-[var(--text)]"
+        className="rounded-lg px-2 py-1 text-xs text-gray-400 transition hover:bg-zinc-900 hover:text-white"
       >
         Sign out
       </button>

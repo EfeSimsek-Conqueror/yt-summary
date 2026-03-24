@@ -26,6 +26,7 @@ export default async function VideoPage({ params }: Props) {
         channels={channels}
         activeChannelId={mock.channelId}
         isAuthenticated={!!user}
+        subscriptionSidebar={false}
       >
         <VideoDetail video={mock} />
       </AppShell>
@@ -60,6 +61,7 @@ export default async function VideoPage({ params }: Props) {
           : channels[0]?.id ?? video.channelId
       }
       isAuthenticated
+      subscriptionSidebar={false}
     >
       <VideoDetail video={video} />
     </AppShell>
