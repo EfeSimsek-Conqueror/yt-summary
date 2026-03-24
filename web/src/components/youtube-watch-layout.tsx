@@ -27,6 +27,29 @@ function thumbClass(id: string) {
   return thumbGradients[i];
 }
 
+/** Explains why segments are empty when /api/ai/video-analysis failed. */
+function segmentAnalysisBlockedReason(error: string): string {
+  if (error.includes("could not access speech")) {
+    return "AI could not read speech from this video (blocked, no speech, or model limits). Try another video or run analysis again later.";
+  }
+  if (error.includes("Captions are disabled")) {
+    return "YouTube captions are disabled; we tried AI transcription from the video. If analysis still failed, see the error above or try again later.";
+  }
+  if (error.includes("No captions available")) {
+    return "No YouTube captions were found; we tried AI transcription from the video. If it still failed, see the error above.";
+  }
+  if (error.includes("Transcript is empty")) {
+    return "The transcript came back empty. Try Run analysis again, or pick a different video.";
+  }
+  if (
+    error.includes("rate limit") ||
+    error.includes("try again later")
+  ) {
+    return "YouTube limited transcript requests. Wait a minute and tap Run analysis again.";
+  }
+  return `${error} Check the message next to the button and use Run analysis to retry.`;
+}
+
 type Props = {
   video: Video;
   channelLabel: string;
@@ -135,7 +158,7 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
   const preAnalysisHint = canEmbed
     ? analysisBusy
       ? "Generating summary and segments…"
-      : "Analysis adds ~250-word recap, key bullet facts, and spoiler-tagged twists when relevant—not the raw transcript."
+      : "Analysis uses YouTube captions when available; otherwise it transcribes speech with AI, then adds a recap, key points, and segments—not the raw transcript."
     : video.transcriptPreview;
 
   const summaryPanelScrollable = !canEmbed || Boolean(analysis);
@@ -348,7 +371,11 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
         <p className="mb-3 text-sm text-muted">
           {channelLabel} · {video.durationLabel} ·{" "}
           {segments.length === 0
-            ? "Pending summary & segment analysis"
+            ? analysisError
+              ? "Summary unavailable (see error below)"
+              : analysisBusy
+                ? "Generating summary & segments…"
+                : "Pending summary & segment analysis"
             : "Click a segment to jump in the player"}
         </p>
 
@@ -361,7 +388,7 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
               className="rounded-lg border border-line bg-raised px-3 py-2 text-sm font-medium text-foreground transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-60"
             >
               {analysisBusy
-                ? "Loading captions & analyzing…"
+                ? "Running analysis…"
                 : analysis
                   ? "Run analysis again"
                   : "Run analysis"}
@@ -485,10 +512,10 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
         {segments.length === 0 ? (
           <p className="text-sm text-muted">
             {analysisBusy
-              ? "Fetching captions and generating summary…"
+              ? "Transcribing or reading captions, then generating summary…"
               : analysisError
-                ? "Analysis did not complete. Fix the error above or retry."
-                : "No segments yet. Analysis runs automatically for real videos (needs captions + FAL_KEY)."}
+                ? segmentAnalysisBlockedReason(analysisError)
+                : "No segments yet. For real videos, run analysis (captions if available; else AI transcription needs GEMINI_API_KEY; summary step needs FAL_KEY)."}
           </p>
         ) : (
           <ul className="space-y-2">

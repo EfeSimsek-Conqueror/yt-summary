@@ -2,7 +2,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { analyzeTranscriptWithGeminiFlash } from "@/lib/ai/analyze-transcript";
 import { getFalKey } from "@/lib/ai/fal-openai";
+import { getGeminiApiKey } from "@/lib/ai/gemini-api-key";
+import { transcribeYoutubeVideoWithGemini } from "@/lib/ai/transcribe-youtube-video";
 import { createClient } from "@/lib/supabase/server";
+import { parseYoutubeVideoId } from "@/lib/youtube/video-id";
 import {
   buildPlainTranscript,
   buildTimedTranscriptForModel,
@@ -48,10 +51,18 @@ function mapTranscriptError(e: unknown): { status: number; message: string } {
   };
 }
 
+function shouldTryAiTranscription(e: unknown): boolean {
+  return (
+    e instanceof YoutubeTranscriptDisabledError ||
+    e instanceof YoutubeTranscriptNotAvailableError ||
+    e instanceof YoutubeTranscriptNotAvailableLanguageError
+  );
+}
+
 /**
  * POST /api/ai/video-analysis
  * Body: { videoId: string (11-char id or watch URL), videoTitle?: string }
- * Fetches captions, then runs Gemini analysis via fal.
+ * Prefers YouTube captions; if missing, transcribes via Gemini (video URL) then analyzes.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -80,26 +91,54 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let items;
+    let items: Awaited<ReturnType<typeof fetchTranscript>> | null = null;
     try {
       items = await fetchTranscript(parsed.data.videoId);
     } catch (e) {
-      const { status, message } = mapTranscriptError(e);
-      console.error("[video-analysis] transcript", e);
-      return NextResponse.json({ error: message }, { status });
+      if (!shouldTryAiTranscription(e)) {
+        const { status, message } = mapTranscriptError(e);
+        console.error("[video-analysis] transcript", e);
+        return NextResponse.json({ error: message }, { status });
+      }
+      console.warn("[video-analysis] captions unavailable, trying AI transcription", e);
+      items = null;
     }
 
-    if (items.length === 0) {
-      return NextResponse.json(
-        { error: "Transcript is empty." },
-        { status: 422 },
-      );
-    }
-
-    const transcriptPlain = buildPlainTranscript(items);
-    let forModel = buildTimedTranscriptForModel(items);
-    if (forModel.length > MAX_MODEL_INPUT) {
-      forModel = transcriptPlain.slice(0, MAX_MODEL_INPUT);
+    let forModel: string;
+    if (items && items.length > 0) {
+      const transcriptPlain = buildPlainTranscript(items);
+      let timed = buildTimedTranscriptForModel(items);
+      if (timed.length > MAX_MODEL_INPUT) {
+        timed = transcriptPlain.slice(0, MAX_MODEL_INPUT);
+      }
+      forModel = timed;
+    } else {
+      if (!getGeminiApiKey()) {
+        return NextResponse.json(
+          {
+            error:
+              "GEMINI_API_KEY is not configured on the server (required when YouTube captions are unavailable).",
+          },
+          { status: 503 },
+        );
+      }
+      const id = parseYoutubeVideoId(parsed.data.videoId);
+      if (!id) {
+        return NextResponse.json(
+          { error: "Could not parse a valid YouTube video id for AI transcription." },
+          { status: 400 },
+        );
+      }
+      try {
+        const plain = await transcribeYoutubeVideoWithGemini(id);
+        forModel =
+          plain.length > MAX_MODEL_INPUT ? plain.slice(0, MAX_MODEL_INPUT) : plain;
+      } catch (e) {
+        const message =
+          e instanceof Error ? e.message : "AI transcription failed.";
+        console.error("[video-analysis] ai-transcribe", e);
+        return NextResponse.json({ error: message }, { status: 502 });
+      }
     }
 
     const analysis = await analyzeTranscriptWithGeminiFlash({

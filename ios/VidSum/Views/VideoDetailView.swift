@@ -1,10 +1,16 @@
 import SwiftUI
 
 struct VideoDetailView: View {
+  @Environment(\.openURL) private var openURL
+
   let video: YTVideo
 
   @State private var embedStartSeconds = 0
   @State private var sidePanelOpen = true
+
+  private var watchOnYouTubeURL: URL? {
+    URL(string: "https://www.youtube.com/watch?v=\(video.id)")
+  }
 
   private var moments: [VideoMoment] {
     VideoMomentGenerator.placeholderMoments(
@@ -27,6 +33,17 @@ struct VideoDetailView: View {
     .background(Color(.systemGroupedBackground))
     .navigationTitle("Video")
     .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .topBarTrailing) {
+        if let watchOnYouTubeURL {
+          Button {
+            openURL(watchOnYouTubeURL)
+          } label: {
+            Label("Open in YouTube", systemImage: "play.rectangle")
+          }
+        }
+      }
+    }
   }
 
   private var portraitLayout: some View {
