@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { formatDurationLabel } from "@/lib/youtube/iso-duration";
 import { getFalOpenAI } from "./fal-openai";
 
 const GEMINI_FLASH = "google/gemini-2.5-flash";
@@ -171,7 +172,24 @@ Rules:
 - Bullets: 1–4 per segment, concise facts only—do not repeat the title or list speaker names again unless needed for content.
 - Cover the whole transcript without leaving huge uncovered gaps when possible.`;
 
+/** Appended when video duration (seconds) is known so segments span the full video. */
+const DURATION_SEGMENT_RULES = `
+
+Critical — when "Video duration" appears in the user message:
+- The video’s total runtime is FIXED (given in seconds). Your segment list MUST cover the entire video from second 0 through the end.
+- The LAST segment’s end_sec must be within about 5–15 seconds of that total duration (the final timestamp), unless the transcript explicitly ends much earlier with no further content.
+- Do NOT stop segment timestamps around an early minute mark (e.g. ~1:50) when the video is several minutes longer—stretch segments across the full 0…duration range so there is no huge uncovered tail.
+- If you have at most 10 segments, divide the timeline proportionally so the narrative spans the full length; the final segment should include what happens in the last part of the video.`;
+
+const VISUAL_MERGE_RULES = `
+
+When a "Visual analysis" section is included below:
+- The speech transcript may be incomplete, wrong for action-heavy scenes, or missing. Use the visual analysis to describe fights, choreography, who is on screen, setting, gameplay UI, and non-dialogue story beats.
+- For films, TV clips, gameplays, and trailers: prefer aligning segments and summaries with BOTH sources; if they conflict on what happened on screen, trust the visual analysis for physical action and identity when visible.
+- Still produce valid JSON; speakers may be inferred from visuals when dialogue is unclear.`;
+
 const MAX_TRANSCRIPT_CHARS = 100_000;
+const MAX_VISUAL_CONTEXT_CHARS = 60_000;
 
 function extractJsonObject(text: string): string {
   const t = text.trim();
@@ -189,17 +207,37 @@ function extractJsonObject(text: string): string {
 export async function analyzeTranscriptWithGeminiFlash(input: {
   transcript: string;
   videoTitle?: string;
+  /** YouTube/runtime length in seconds (from client metadata). Ensures segments span full video. */
+  videoDurationSec?: number;
+  /** On-screen description when speech transcript is thin (no-caption fallback). */
+  visualContext?: string;
 }): Promise<TranscriptAnalysis> {
+  const visual =
+    input.visualContext?.trim() &&
+    `\n\n---\nVisual analysis (on-screen; use per instructions when present):\n${input.visualContext.slice(0, MAX_VISUAL_CONTEXT_CHARS)}`;
+
+  const durationBlock =
+    input.videoDurationSec !== undefined &&
+    input.videoDurationSec > 0 &&
+    Number.isFinite(input.videoDurationSec)
+      ? `\nVideo duration: ${Math.round(input.videoDurationSec)} seconds (about ${formatDurationLabel(Math.round(input.videoDurationSec))} total). Use this as the end of the timeline for segments.\n`
+      : "";
+
   const body =
     input.videoTitle !== undefined
-      ? `Video title: ${input.videoTitle}\n\nTranscript:\n${input.transcript.slice(0, MAX_TRANSCRIPT_CHARS)}`
-      : `Transcript:\n${input.transcript.slice(0, MAX_TRANSCRIPT_CHARS)}`;
+      ? `Video title: ${input.videoTitle}\n${durationBlock}\nTranscript:\n${input.transcript.slice(0, MAX_TRANSCRIPT_CHARS)}${visual ?? ""}`
+      : `${durationBlock ? `${durationBlock}\n` : ""}Transcript:\n${input.transcript.slice(0, MAX_TRANSCRIPT_CHARS)}${visual ?? ""}`;
+
+  const hasDuration =
+    input.videoDurationSec !== undefined &&
+    input.videoDurationSec > 0 &&
+    Number.isFinite(input.videoDurationSec);
 
   const client = getFalOpenAI();
 
   const response = await client.responses.create({
     model: GEMINI_FLASH,
-    instructions: INSTRUCTIONS,
+    instructions: `${INSTRUCTIONS}${hasDuration ? DURATION_SEGMENT_RULES : ""}${visual ? VISUAL_MERGE_RULES : ""}`,
     input: body,
     temperature: 0.35,
     max_output_tokens: 8192,

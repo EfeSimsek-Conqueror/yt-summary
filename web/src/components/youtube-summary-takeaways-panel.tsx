@@ -37,10 +37,14 @@ export function YoutubeSummaryTakeawaysPanel({
 }: Props) {
   return (
     <>
-      <h2 className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-muted">
+      <h2
+        id="vidsum-summary-heading"
+        className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-muted"
+      >
         {canEmbed ? "Summary & takeaways" : "Transcript preview"}
       </h2>
       <div
+        suppressHydrationWarning
         className={`relative min-h-0 flex-1 text-sm leading-relaxed ${
           summaryPanelScrollable
             ? "overflow-y-auto pr-1"
@@ -66,6 +70,14 @@ export function YoutubeSummaryTakeawaysPanel({
             ) ? (
               <p className="rounded-md border border-amber-500/35 bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-100/95">
                 May contain spoilers for story or gameplay reveals.
+              </p>
+            ) : null}
+
+            {analysis.usedVisualFallback ? (
+              <p className="rounded-md border border-sky-500/30 bg-sky-950/25 px-2.5 py-1.5 text-xs text-sky-100/90">
+                This summary also used on-screen visual analysis (helpful when
+                captions were missing and speech was thin—e.g. films or
+                gameplay).
               </p>
             ) : null}
 

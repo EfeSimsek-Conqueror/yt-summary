@@ -62,4 +62,8 @@ export type AnalysisPayload = {
   keyPoints: string[];
   segments: Segment[];
   hypeMoments: AnalysisHypeMoment[];
+  /** Set when no captions and on-screen analysis supplemented thin speech transcript. */
+  usedVisualFallback?: boolean;
+  /** 0–100 speech-density vs length when captions were missing; omitted when captions used. */
+  transcriptDensityScore?: number | null;
 };

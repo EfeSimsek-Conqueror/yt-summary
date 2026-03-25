@@ -20,6 +20,7 @@ import {
 } from "@/lib/segment-mood";
 import { formatSecondsAsMmSs, segmentStartSeconds } from "@/lib/segment-time";
 import { isLikelyYoutubeVideoId } from "@/lib/youtube/video-id";
+import { parseDurationLabelToSeconds } from "@/lib/youtube/iso-duration";
 
 const thumbGradients = [
   "from-slate-600 to-slate-900",
@@ -182,7 +183,48 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsError, setCommentsError] = useState<string | null>(null);
 
+  /** Fullscreen: left 25% segments, right 75% player (summary stays on page). */
+  const watchStageRef = useRef<HTMLDivElement>(null);
+  const [watchFullscreen, setWatchFullscreen] = useState(false);
+
   const canEmbed = isLikelyYoutubeVideoId(video.id);
+
+  useEffect(() => {
+    const sync = () => {
+      const el = watchStageRef.current;
+      const fs = document.fullscreenElement;
+      const webFs = (
+        document as Document & { webkitFullscreenElement?: Element | null }
+      ).webkitFullscreenElement;
+      setWatchFullscreen(Boolean(el && (fs === el || webFs === el)));
+    };
+    document.addEventListener("fullscreenchange", sync);
+    document.addEventListener("webkitfullscreenchange", sync);
+    return () => {
+      document.removeEventListener("fullscreenchange", sync);
+      document.removeEventListener("webkitfullscreenchange", sync);
+    };
+  }, []);
+
+  const toggleWatchFullscreen = useCallback(() => {
+    const el = watchStageRef.current;
+    if (!el) return;
+    const fs = document.fullscreenElement;
+    const webFs = (
+      document as Document & { webkitFullscreenElement?: Element | null }
+    ).webkitFullscreenElement;
+    if (fs === el || webFs === el) {
+      if (document.exitFullscreen) void document.exitFullscreen();
+      else
+        (document as Document & { webkitExitFullscreen?: () => void })
+          .webkitExitFullscreen?.();
+      return;
+    }
+    if (el.requestFullscreen) void el.requestFullscreen();
+    else
+      (el as HTMLElement & { webkitRequestFullscreen?: () => void })
+        .webkitRequestFullscreen?.();
+  }, []);
 
   useEffect(() => {
     setAnalysis(null);
@@ -194,6 +236,10 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
     setPlayerPhase("loading");
     setPlayhead(0);
     playerRef.current = null;
+    setWatchFullscreen(false);
+    if (typeof document !== "undefined" && document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => {});
+    }
   }, [video.id]);
 
   const segments = analysis?.segments ?? video.segments;
@@ -202,7 +248,7 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
   const preAnalysisHint = canEmbed
     ? analysisBusy
       ? "Generating summary and segments…"
-      : "Analysis uses YouTube captions when available; otherwise it transcribes speech with AI, then adds a recap, key points, and segments—not the raw transcript."
+      : "Analysis uses YouTube captions when available; otherwise it transcribes speech with AI. If speech is thin for the video length, on-screen visual analysis is added automatically (films, games, scenes), then recap and segments—not the raw transcript."
     : video.transcriptPreview;
 
   const summaryPanelScrollable = !canEmbed || Boolean(analysis);
@@ -240,12 +286,15 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
       setAnalysisBusy(true);
       setAnalysisError(null);
       try {
+        const durationSec = parseDurationLabelToSeconds(video.durationLabel);
         const res = await fetch("/api/ai/video-analysis", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             videoId: video.id,
             videoTitle: video.title,
+            ...(durationSec != null ? { durationSec } : {}),
+            durationLabel: video.durationLabel,
           }),
           signal,
         });
@@ -267,6 +316,8 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
           keyPoints?: unknown;
           segments?: ApiSegment[];
           hypeMoments?: unknown;
+          usedVisualFallback?: boolean;
+          transcriptDensityScore?: number | null;
         };
         const revelations = Array.isArray(d.revelations)
           ? d.revelations.filter((x): x is string => typeof x === "string")
@@ -296,6 +347,13 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
           keyPoints,
           segments: mapApiSegments(d.segments),
           hypeMoments: mapApiHypeMoments(d.hypeMoments),
+          usedVisualFallback: Boolean(d.usedVisualFallback),
+          transcriptDensityScore:
+            typeof d.transcriptDensityScore === "number"
+              ? d.transcriptDensityScore
+              : d.transcriptDensityScore === null
+                ? null
+                : undefined,
         });
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") {
@@ -308,7 +366,7 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
         }
       }
     },
-    [video.id, video.title],
+    [video.id, video.title, video.durationLabel],
   );
 
   useEffect(() => {
@@ -399,11 +457,28 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
   const youtubeEmbedSrc = `https://www.youtube.com/embed/${encodeURIComponent(video.id)}?rel=0&modestbranding=1&playsinline=1`;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)_380px] lg:items-start">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
+      <div className="min-w-0 flex flex-col gap-3">
+        <div
+          ref={watchStageRef}
+          className={
+            watchFullscreen
+              ? "relative grid min-h-0 w-full grid-cols-1 gap-3 bg-black p-3 sm:grid-cols-[25%_minmax(0,1fr)] sm:gap-4"
+              : "grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start"
+          }
+        >
       <aside
-        className="order-2 min-w-0 rounded-xl border border-line bg-surface p-4 lg:sticky lg:top-16 lg:order-none lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto"
+        className={`order-2 min-w-0 rounded-xl border border-line bg-surface p-4 lg:sticky lg:top-16 lg:order-none lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto ${
+          watchFullscreen
+            ? "min-h-0 overflow-y-auto sm:max-h-[100vh] sm:border-r sm:border-line/30 sm:pr-2"
+            : ""
+        }`}
         aria-label="Segment analysis"
       >
+        {watchFullscreen ? (
+          <span className="sr-only">Segments — tap to seek</span>
+        ) : (
+          <>
         <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
           Segments (max 10)
         </h2>
@@ -416,104 +491,106 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
                 : "Loading player…"}
           </p>
         ) : null}
-
-        {segments.length === 0 ? (
-          <p className="text-sm text-muted">
-            {analysisBusy
-              ? "Transcribing or reading captions, then generating summary…"
-              : analysisError
-                ? segmentAnalysisBlockedReason(analysisError)
-                : "No segments yet. For real videos, run analysis (FAL_KEY required; captions if available, else AI transcription via FAL or optional GEMINI_API_KEY)."}
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {segmentTimes.map(({ idx, sec, seg }) => {
-              const active = idx === activeSegmentIdx;
-              const jumpable = sec !== null && canJump;
-              const mood = seg.mood ?? "neutral";
-              const v = moodVisuals(mood);
-              return (
-                <li key={idx}>
-                  <button
-                    type="button"
-                    disabled={!jumpable}
-                    onClick={() => sec !== null && seekTo(sec)}
-                    className={`w-full rounded-lg border-y border-r border-line border-l-4 py-2.5 pl-3 pr-3 text-left transition ${v.borderLeft} ${
-                      active
-                        ? `ring-2 ring-offset-2 ring-offset-canvas ${v.activeRing} ${v.activeBg}`
-                        : "hover:bg-raised/90"
-                    } ${!jumpable ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
-                    title={
-                      !canEmbed
-                        ? "Requires a YouTube embed"
-                        : embedFallback
-                          ? "Retry interactive player to enable seek"
-                          : !playerReady
-                            ? playerPhase === "loading"
-                              ? "Player loading"
-                              : "Seek unavailable until the player loads"
-                            : sec === null
-                              ? "Invalid timestamp"
-                              : `Jump to ${seg.startLabel}`
-                    }
-                  >
-                    <div className="mb-1.5 space-y-1.5">
-                      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs leading-snug">
-                        <span className="shrink-0 font-bold text-accent">
-                          {seg.startLabel} – {seg.endLabel}
-                        </span>
-                        {seg.heading ? (
-                          <span className="min-w-0 font-semibold text-foreground">
-                            {seg.heading}
-                          </span>
-                        ) : null}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span
-                          className={`rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${v.chip}`}
-                        >
-                          {MOOD_LABELS[mood]}
-                        </span>
-                        {seg.speakers && seg.speakers.length > 0 ? (
-                          <p className={`min-w-0 text-[11px] leading-snug ${v.speakerLine}`}>
-                            <span className="opacity-85">Who’s talking:</span>{" "}
-                            <span
-                              className={`font-semibold tracking-tight ${v.speakerNames}`}
-                            >
-                              {seg.speakers.join(" · ")}
-                            </span>
-                          </p>
-                        ) : (
-                          <p className="text-[11px] text-muted/75">
-                            Who’s talking: not identified
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <ul className="list-disc space-y-1 pl-[18px] text-sm leading-relaxed text-muted">
-                      {seg.bullets.map((b, i) => (
-                        <li key={i}>{b}</li>
-                      ))}
-                    </ul>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          </>
         )}
+
+            {segments.length === 0 ? (
+              <p className="text-sm text-muted">
+                {analysisBusy
+                  ? "Transcribing or reading captions, then generating summary…"
+                  : analysisError
+                    ? segmentAnalysisBlockedReason(analysisError)
+                    : "No segments yet. For real videos, run analysis (FAL_KEY required; captions if available, else AI transcription via FAL or optional GEMINI_API_KEY)."}
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {segmentTimes.map(({ idx, sec, seg }) => {
+                  const active = idx === activeSegmentIdx;
+                  const jumpable = sec !== null && canJump;
+                  const mood = seg.mood ?? "neutral";
+                  const v = moodVisuals(mood);
+                  return (
+                    <li key={idx}>
+                      <button
+                        type="button"
+                        disabled={!jumpable}
+                        onClick={() => sec !== null && seekTo(sec)}
+                        className={`w-full rounded-lg border-y border-r border-line border-l-4 py-2.5 pl-3 pr-3 text-left transition ${v.borderLeft} ${
+                          active
+                            ? `ring-2 ring-offset-2 ring-offset-canvas ${v.activeRing} ${v.activeBg}`
+                            : "hover:bg-raised/90"
+                        } ${!jumpable ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+                        title={
+                          !canEmbed
+                            ? "Requires a YouTube embed"
+                            : embedFallback
+                              ? "Retry interactive player to enable seek"
+                              : !playerReady
+                                ? playerPhase === "loading"
+                                  ? "Player loading"
+                                  : "Seek unavailable until the player loads"
+                                : sec === null
+                                  ? "Invalid timestamp"
+                                  : `Jump to ${seg.startLabel}`
+                        }
+                      >
+                        <div className="mb-1.5 space-y-1.5">
+                          <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs leading-snug">
+                            <span className="shrink-0 font-bold text-accent">
+                              {seg.startLabel} – {seg.endLabel}
+                            </span>
+                            {seg.heading ? (
+                              <span className="min-w-0 font-semibold text-foreground">
+                                {seg.heading}
+                              </span>
+                            ) : null}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span
+                              className={`rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${v.chip}`}
+                            >
+                              {MOOD_LABELS[mood]}
+                            </span>
+                            {seg.speakers && seg.speakers.length > 0 ? (
+                              <p className={`min-w-0 text-[11px] leading-snug ${v.speakerLine}`}>
+                                <span className="opacity-85">Who’s talking:</span>{" "}
+                                <span
+                                  className={`font-semibold tracking-tight ${v.speakerNames}`}
+                                >
+                                  {seg.speakers.join(" · ")}
+                                </span>
+                              </p>
+                            ) : (
+                              <p className="text-[11px] text-muted/75">
+                                Who’s talking: not identified
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <ul className="list-disc space-y-1 pl-[18px] text-sm leading-relaxed text-muted">
+                          {seg.bullets.map((b, i) => (
+                            <li key={i}>{b}</li>
+                          ))}
+                        </ul>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
       </aside>
 
       <div className="order-1 min-w-0 space-y-6 lg:order-none">
         <div className="min-w-0 space-y-3">
-        <div
-          className={
-            canEmbed
-              ? "relative aspect-video overflow-hidden rounded-xl border border-line bg-black"
-              : video.thumbnailUrl
-                ? "relative aspect-video overflow-hidden rounded-xl border border-line"
-                : `relative aspect-video overflow-hidden rounded-xl border border-line bg-gradient-to-br ${thumbClass(video.id)}`
-          }
-        >
+              <div
+                className={
+                  canEmbed
+                    ? "relative aspect-video overflow-hidden rounded-xl border border-line bg-black"
+                    : video.thumbnailUrl
+                      ? "relative aspect-video overflow-hidden rounded-xl border border-line"
+                      : `relative aspect-video overflow-hidden rounded-xl border border-line bg-gradient-to-br ${thumbClass(video.id)}`
+                }
+              >
           {canEmbed && embedFallback ? (
             <iframe
               className="absolute inset-0 h-full w-full border-0"
@@ -587,6 +664,8 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
         ) : null}
         </div>
 
+        {!watchFullscreen ? (
+          <>
         <h1 className="mb-2 text-xl font-semibold tracking-tight">
           {video.title}
         </h1>
@@ -647,34 +726,68 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
                 "No comments loaded (comments disabled, API quota, or add YOUTUBE_DATA_API_KEY in .env.local—this is separate from GEMINI_API_KEY)."}
             </p>
           ) : (
-            <ol className="space-y-4">
-              {topComments.map((c, i) => (
-                <li
-                  key={`${c.author}-${i}`}
-                  className="border-b border-line pb-4 last:border-0 last:pb-0"
-                >
-                  <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <span className="font-semibold text-foreground">
-                      {c.author}
-                    </span>
-                    <span className="inline-flex items-center gap-1 rounded-md bg-zinc-800/90 px-2 py-0.5 text-muted">
-                      <ThumbsUp className="h-3 w-3 shrink-0" aria-hidden />
-                      {c.likeCount.toLocaleString()}
-                    </span>
-                  </div>
-                  <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted">
-                    {c.text}
-                  </p>
-                </li>
-              ))}
-            </ol>
+            <div
+              className="max-h-[min(26rem,45vh)] overflow-y-auto overscroll-y-contain pr-1 [scrollbar-gutter:stable]"
+              aria-label="Top comments"
+            >
+              <ol className="space-y-4">
+                {topComments.map((c, i) => (
+                  <li
+                    key={`${c.author}-${i}`}
+                    className="border-b border-line pb-4 last:border-0 last:pb-0"
+                  >
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="font-semibold text-foreground">
+                        {c.author}
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-md bg-zinc-800/90 px-2 py-0.5 text-muted">
+                        <ThumbsUp className="h-3 w-3 shrink-0" aria-hidden />
+                        {c.likeCount.toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted">
+                      {c.text}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            </div>
           )}
         </div>
+          </>
+        ) : null}
+      </div>
+        {watchFullscreen ? (
+          <button
+            type="button"
+            onClick={toggleWatchFullscreen}
+            className="absolute bottom-4 right-4 z-20 rounded-lg border border-white/20 bg-black/80 px-3 py-2 text-xs font-medium text-white backdrop-blur hover:bg-black/90"
+          >
+            Exit fullscreen
+          </button>
+        ) : null}
+        </div>
+
+        {canEmbed ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleWatchFullscreen}
+              className="rounded-lg border border-line bg-raised px-3 py-2 text-sm font-medium text-foreground transition hover:bg-surface"
+            >
+              Fullscreen (25% segments + video)
+            </button>
+            <span className="text-[11px] text-muted">
+              Esc to exit. Summary stays on the page.
+            </span>
+          </div>
+        ) : null}
       </div>
 
       <aside
-        className="order-3 min-w-0 rounded-xl border border-line bg-surface p-4 lg:sticky lg:top-16 lg:order-none lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto"
-        aria-label="Summary and takeaways"
+        suppressHydrationWarning
+        className="w-full shrink-0 rounded-xl border border-line bg-surface p-4 lg:sticky lg:top-16 lg:w-[380px] lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto"
+        aria-labelledby="vidsum-summary-heading"
       >
         <YoutubeSummaryTakeawaysPanel
           canEmbed={canEmbed}

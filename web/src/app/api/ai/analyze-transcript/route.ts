@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 const bodySchema = z.object({
   transcript: z.string().min(1).max(200_000),
   videoTitle: z.string().max(500).optional(),
+  videoDurationSec: z.number().positive().max(86400).optional(),
 });
 
 /**
