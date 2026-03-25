@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VidSum — Extension settings</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="popup options-page">
+      <div class="popup-logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="white" stroke-width="2">
+          <path d="M23 7l-7 5 7 5V7z" />
+          <rect x="1" y="5" width="15" height="14" rx="2" />
+        </svg>
+      </div>
+      <h1>VidSum Extension</h1>
+      <p class="subtitle">Chrome → Extensions → VidSum → Details → Extension options</p>
+
+      <label class="field">
+        <span>VidSum site URL</span>
+        <input
+          type="text"
+          id="baseUrl"
+          placeholder="http://localhost:3000"
+          spellcheck="false"
+          autocomplete="off"
+        />
+      </label>
+
+      <label class="field checkbox">
+        <input type="checkbox" id="showOverlay" checked />
+        <span>Show floating panel on YouTube</span>
+      </label>
+
+      <p class="hint-tabs">
+        <strong>Segments, Summary, Settings</strong> for the video appear in the
+        <strong>floating panel</strong> on <code>youtube.com/watch?v=…</code> (top-right).
+      </p>
+
+      <div id="view-out" class="view">
+        <p class="footer" style="margin-bottom: 12px">
+          This extension does <strong>not</strong> open the VidSum website. To sign in, open VidSum in a
+          normal tab yourself (paste the URL above into the address bar).
+        </p>
+      </div>
+
+      <div id="view-in" class="view hidden">
+        <p class="badge-ok">Signed in to VidSum</p>
+        <p id="signedEmail" class="signed-email"></p>
+        <button type="button" id="btnRefresh" class="btn-ghost">Refresh status</button>
+        <p class="footer">
+          Session is read from VidSum cookies in this browser. This page never opens web pages.
+        </p>
+      </div>
+
+      <p id="status" class="status" role="status"></p>
+    </div>
+    <script src="options.js"></script>
+  </body>
+</html>

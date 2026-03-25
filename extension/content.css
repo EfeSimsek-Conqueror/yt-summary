@@ -1,0 +1,6 @@
+/* Host page isolation — main UI lives in Shadow DOM; this file only hides stray if any */
+#vidsum-extension-root {
+  all: initial;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+}
