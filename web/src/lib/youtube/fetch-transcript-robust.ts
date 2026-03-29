@@ -7,15 +7,18 @@ import {
   YoutubeTranscriptTooManyRequestError,
 } from "youtube-transcript";
 import { parseYoutubeVideoId } from "./video-id";
-import { transcriptFetchOpts } from "./youtube-transcript-fetch";
+import {
+  transcriptFetchOpts,
+  youtubeLikeFetch,
+} from "./youtube-transcript-fetch";
 
 const TRANSCRIPT_RATE_LIMIT_RETRIES = 3;
 const TRANSCRIPT_RATE_LIMIT_BASE_DELAY_MS = 1500;
 
 /** `youtube-transcript` is usually fast; cap so we never block the whole request forever. */
 const FETCH_TRANSCRIPT_TIMEOUT_MS = 22_000;
-/** Innertube + getTranscript can be slow; still cap so parallel `allSettled` completes. */
-const YOUTUBEI_TRANSCRIPT_TIMEOUT_MS = 35_000;
+/** Innertube getInfo + caption XML fetch (no `/get_transcript` — avoids 400 FAILED_PRECONDITION). */
+const INNERTUBE_CAPTION_TIMEOUT_MS = 40_000;
 
 let innertubePromise: Promise<Innertube> | null = null;
 
@@ -56,31 +59,79 @@ function withTimeout<T>(
   });
 }
 
-/** youtubei.js segment shapes drift between versions — extract text/timing loosely. */
-function transcriptSegmentToRow(seg: unknown): TranscriptResponse | null {
-  if (!seg || typeof seg !== "object") return null;
-  const o = seg as Record<string, unknown>;
-  const startMs = parseInt(String(o.start_ms ?? ""), 10);
-  const endMs = parseInt(String(o.end_ms ?? ""), 10);
-  let text = "";
-  if (o.snippet != null && typeof (o.snippet as { toString?: () => string }).toString === "function") {
-    text = (o.snippet as { toString: () => string }).toString().trim();
-  }
-  if (!text && Array.isArray(o.runs)) {
-    text = (o.runs as { text?: string }[])
-      .map((r) => r?.text ?? "")
-      .join("")
-      .trim();
-  }
-  if (!text) return null;
-  const startSec = Number.isFinite(startMs) ? startMs / 1000 : 0;
-  const durSec =
-    Number.isFinite(endMs) && Number.isFinite(startMs)
-      ? Math.max(0, (endMs - startMs) / 1000)
-      : 0;
-  return { text, offset: startSec, duration: durSec };
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) =>
+      String.fromCodePoint(parseInt(h, 16)),
+    )
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(parseInt(n, 10)));
 }
 
+/** srv3 `<p t= dur=` (ms) + legacy `<text start= dur=` (seconds). Matches youtube-transcript heuristics. */
+function parseTimedtextXml(xml: string, lang: string): TranscriptResponse[] {
+  const out: TranscriptResponse[] = [];
+  const srv3 = /<p\s+t="(\d+)"\s+d="(\d+)"[^>]*>([\s\S]*?)<\/p>/g;
+  let m: RegExpExecArray | null;
+  for (; (m = srv3.exec(xml)) !== null; ) {
+    const tMs = parseInt(m[1]!, 10);
+    const dMs = parseInt(m[2]!, 10);
+    let inner = m[3] ?? "";
+    let text = "";
+    const sre = /<s[^>]*>([^<]*)<\/s>/g;
+    let sm: RegExpExecArray | null;
+    for (; (sm = sre.exec(inner)) !== null; ) text += sm[1] ?? "";
+    if (!text) text = inner.replace(/<[^>]+>/g, "");
+    text = decodeEntities(text).trim();
+    if (!text) continue;
+    out.push({
+      text,
+      offset: tMs,
+      duration: dMs,
+      lang,
+    });
+  }
+  if (out.length > 0) return out;
+  const classic = /<text start="([^"]*)" dur="([^"]*)">([^<]*)<\/text>/g;
+  for (; (m = classic.exec(xml)) !== null; ) {
+    const text = decodeEntities(m[3] ?? "").trim();
+    if (!text) continue;
+    out.push({
+      text,
+      offset: parseFloat(m[1]!),
+      duration: parseFloat(m[2]!),
+      lang,
+    });
+  }
+  return out;
+}
+
+function ensureSrv3Fmt(baseUrl: string): string {
+  try {
+    const u = new URL(baseUrl);
+    if (!u.searchParams.has("fmt")) u.searchParams.set("fmt", "srv3");
+    return u.toString();
+  } catch {
+    return baseUrl.includes("fmt=")
+      ? baseUrl
+      : `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}fmt=srv3`;
+  }
+}
+
+type InnertubeCaptionTrack = {
+  base_url?: string;
+  language_code?: string;
+};
+
+/**
+ * Uses player `captionTracks[].baseUrl` from InnerTube — does NOT call `/youtubei/v1/get_transcript`
+ * (that endpoint often returns 400 FAILED_PRECONDITION for server/bot clients).
+ */
 async function fetchTranscriptViaYoutubei(
   videoIdRaw: string,
 ): Promise<TranscriptResponse[]> {
@@ -91,43 +142,43 @@ async function fetchTranscriptViaYoutubei(
 
   const yt = await getInnertube();
   const info = await yt.getInfo(id);
-  const transcriptInfo = await info.getTranscript();
-  const segments = transcriptInfo.transcript.content?.body?.initial_segments;
-  if (!segments?.length) {
+  const caps = info.captions as
+    | { caption_tracks?: InnertubeCaptionTrack[] }
+    | null
+    | undefined;
+  const tracks = caps?.caption_tracks;
+  if (!tracks?.length) {
     throw new YoutubeTranscriptNotAvailableError(id);
   }
 
-  const out: TranscriptResponse[] = [];
-  for (const seg of segments) {
-    if (
-      seg &&
-      typeof seg === "object" &&
-      (seg as { type?: string }).type === "TranscriptSegment"
-    ) {
-      const s = seg as {
-        start_ms: string;
-        end_ms: string;
-        snippet: { toString(): string };
-      };
-      const startMs = parseInt(s.start_ms, 10);
-      const endMs = parseInt(s.end_ms, 10);
-      const text = s.snippet.toString().trim();
-      if (!text) continue;
-      const startSec = Number.isFinite(startMs) ? startMs / 1000 : 0;
-      const durSec = Number.isFinite(endMs)
-        ? Math.max(0, (endMs - startMs) / 1000)
-        : 0;
-      out.push({ text, offset: startSec, duration: durSec });
-    } else {
-      const row = transcriptSegmentToRow(seg);
-      if (row) out.push(row);
+  const ordered: InnertubeCaptionTrack[] = [];
+  const seen = new Set<string>();
+  const push = (t: InnertubeCaptionTrack | undefined) => {
+    if (t?.base_url && !seen.has(t.base_url)) {
+      seen.add(t.base_url);
+      ordered.push(t);
     }
+  };
+  push(tracks.find((t) => t.language_code === "en"));
+  push(tracks.find((t) => t.language_code?.startsWith("en")));
+  push(tracks.find((t) => t.language_code === "tr"));
+  for (const t of tracks) push(t);
+
+  for (const track of ordered.slice(0, 8)) {
+    const baseUrl = track.base_url;
+    if (!baseUrl) continue;
+    const url = ensureSrv3Fmt(baseUrl);
+    const res = await youtubeLikeFetch(url, {
+      headers: { Accept: "*/*" },
+    });
+    if (!res.ok) continue;
+    const xml = await res.text();
+    const lang = track.language_code ?? "en";
+    const rows = parseTimedtextXml(xml, lang);
+    if (rows.length > 0) return rows;
   }
 
-  if (out.length === 0) {
-    throw new YoutubeTranscriptNotAvailableError(id);
-  }
-  return out;
+  throw new YoutubeTranscriptNotAvailableError(id);
 }
 
 /**
@@ -219,7 +270,7 @@ export async function fetchTranscriptRobust(
     ),
     withTimeout(
       fetchTranscriptViaYoutubei(videoIdRaw),
-      YOUTUBEI_TRANSCRIPT_TIMEOUT_MS,
+      INNERTUBE_CAPTION_TIMEOUT_MS,
       vid,
       true,
     ),
