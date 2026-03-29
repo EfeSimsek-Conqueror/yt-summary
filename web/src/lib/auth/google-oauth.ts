@@ -1,5 +1,6 @@
 "use client";
 
+import { getOAuthRedirectOrigin } from "@/lib/app-url";
 import { createClient } from "@/lib/supabase/client";
 
 const YOUTUBE_GOOGLE_SCOPES =
@@ -8,7 +9,7 @@ const YOUTUBE_GOOGLE_SCOPES =
 /** `next` must be a path on this origin (e.g. current page). */
 export async function signInWithGoogle(next: string = "/") {
   const supabase = createClient();
-  const origin = window.location.origin;
+  const origin = getOAuthRedirectOrigin();
   const safeNext = next.startsWith("/") ? next : "/";
   await supabase.auth.signInWithOAuth({
     provider: "google",
@@ -29,7 +30,7 @@ export async function signInWithGoogle(next: string = "/") {
  */
 export async function linkGoogleForYoutube(next: string = "/") {
   const supabase = createClient();
-  const origin = window.location.origin;
+  const origin = getOAuthRedirectOrigin();
   const safeNext = next.startsWith("/") ? next : "/";
   const { error } = await supabase.auth.linkIdentity({
     provider: "google",

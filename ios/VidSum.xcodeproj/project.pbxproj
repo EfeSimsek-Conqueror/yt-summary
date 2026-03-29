@@ -38,7 +38,7 @@
 		50C9BA2551B3DA91B01A655E /* AppSecrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSecrets.swift; sourceTree = "<group>"; };
 		6586779FCCA55E25F69419B1 /* ISO8601Duration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ISO8601Duration.swift; sourceTree = "<group>"; };
 		8A9FAC052F3552A9B92CC50B /* VideoRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoRow.swift; sourceTree = "<group>"; };
-		8C0D09BC03F25FC495FE19E6 /* VidSum.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = VidSum.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8C0D09BC03F25FC495FE19E6 /* VidSum.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VidSum.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		94D809B227CED15F98C2B1C5 /* VideoDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoDetailView.swift; sourceTree = "<group>"; };
 		9A410FF8EF32BA92AC54AAFC /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		A1906199ED57702AC4F09F8D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -302,6 +302,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 10;
+				DEVELOPMENT_TEAM = RDL94ZAPT3;
 				INFOPLIST_FILE = VidSum/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -322,6 +323,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 10;
+				DEVELOPMENT_TEAM = RDL94ZAPT3;
 				INFOPLIST_FILE = VidSum/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

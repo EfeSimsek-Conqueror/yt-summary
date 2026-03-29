@@ -4,6 +4,8 @@ type Props = {
   needsYoutubeScope?: boolean;
   youtubeError?: string;
   source: "youtube" | "mock";
+  /** When true, copy avoids “sign in” — user is already signed in to VidSum. */
+  isSignedIn?: boolean;
 };
 
 /**
@@ -13,6 +15,7 @@ export function YoutubeSyncHint({
   needsYoutubeScope,
   youtubeError,
   source,
+  isSignedIn,
 }: Props) {
   if (source === "youtube" && !needsYoutubeScope && !youtubeError) {
     return null;
@@ -24,10 +27,23 @@ export function YoutubeSyncHint({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <p className="min-w-0 leading-relaxed">
             <strong className="font-semibold">YouTube isn’t connected yet.</strong>{" "}
-            Signing in with email doesn’t give a Google access token. Use{" "}
-            <strong>Connect Google for YouTube</strong> (or sign out and &quot;Sign
-            in with Google&quot;) so we can call YouTube Data API v3 with{" "}
-            <code className="rounded bg-black/30 px-1">youtube.readonly</code>.
+            {isSignedIn ? (
+              <>
+                You’re signed in to VidSum, but we still need a Google access token
+                with YouTube scope. Tap{" "}
+                <strong>Connect Google for YouTube</strong> (or sign out and use
+                &quot;Sign in with Google&quot; once) so we can call YouTube Data API
+                v3 with{" "}
+                <code className="rounded bg-black/30 px-1">youtube.readonly</code>.
+              </>
+            ) : (
+              <>
+                Signing in with email doesn’t give a Google access token. Use{" "}
+                <strong>Connect Google for YouTube</strong> (or sign out and &quot;Sign
+                in with Google&quot;) so we can call YouTube Data API v3 with{" "}
+                <code className="rounded bg-black/30 px-1">youtube.readonly</code>.
+              </>
+            )}
           </p>
           <ConnectYoutubeCta className="shrink-0" />
         </div>
@@ -43,9 +59,11 @@ export function YoutubeSyncHint({
             <strong className="font-semibold">YouTube API:</strong> could not load
             subscriptions.{" "}
             <span className="opacity-80">
-              Enable <strong>YouTube Data API v3</strong> in Google Cloud for your
-              OAuth client and check quota. If you signed in with email only, connect
-              Google below.
+              Enable <strong>YouTube Data API v3</strong> in Google Cloud for the
+              OAuth client used by Supabase, and check quota.{" "}
+              {isSignedIn
+                ? "Then use Reconnect below if the token needs a refresh."
+                : "If you use email sign-in, connect Google below."}
             </span>
           </p>
           <ConnectYoutubeCta

@@ -48,11 +48,16 @@ export default async function DashboardPage({ searchParams }: Props) {
     ? await getVideosFromYoutubeSearch(searchQuery, source)
     : await getVideosForHome(channel.id, source);
 
+  const signedIn = Boolean(user);
   const searchErrorDetail =
     uploadsError === "search_requires_youtube"
-      ? "Video search needs a Google sign-in with YouTube access (not the sample catalog)."
+      ? signedIn
+        ? "Connect Google for YouTube — your VidSum account is signed in, but search needs a YouTube API token (not the sample catalog)."
+        : "Video search needs a Google sign-in with YouTube access (not the sample catalog)."
       : uploadsError === "missing_provider_token"
-        ? "Sign in with Google (YouTube scope) to search."
+        ? signedIn
+          ? "Connect Google for YouTube — your session has no YouTube token yet."
+          : "Sign in with Google (YouTube scope) to search."
         : uploadsError;
 
   return (
@@ -67,6 +72,7 @@ export default async function DashboardPage({ searchParams }: Props) {
           needsYoutubeScope={needsYoutubeScope}
           youtubeError={youtubeError}
           source={source}
+          isSignedIn={signedIn}
         />
         <div className="mb-8">
           <VideoSearchBar
@@ -84,10 +90,14 @@ export default async function DashboardPage({ searchParams }: Props) {
             {isSearch
               ? source === "youtube"
                 ? "YouTube search (opens the video page for transcript & analysis)"
-                : "Sample mode — sign in with YouTube scope to search"
+                : signedIn
+                  ? "Connect Google for YouTube to search — you’re signed in to VidSum."
+                  : "Sample mode — sign in with Google (YouTube) to search"
               : source === "youtube" && resolvedId.startsWith("UC")
                 ? "Latest uploads from YouTube"
-                : "Sample catalog (sign in with YouTube scope for real subs)"}
+                : signedIn
+                  ? "Sample catalog — connect Google for YouTube to see your real subscriptions."
+                  : "Sample catalog (sign in with Google for real subs)"}
           </p>
         </header>
         {uploadsError ? (
@@ -95,7 +105,9 @@ export default async function DashboardPage({ searchParams }: Props) {
             {isSearch
               ? `Search failed: ${searchErrorDetail}`
               : uploadsError === "missing_provider_token"
-                ? "Sign in with Google (YouTube scope) to load subscriptions and uploads."
+                ? signedIn
+                  ? "You’re signed in — use Connect Google for YouTube (header) to load subscriptions and uploads."
+                  : "Sign in with Google (YouTube scope) to load subscriptions and uploads."
                 : "Could not load uploads. Re-sign in with Google or check API quota."}
           </p>
         ) : null}
