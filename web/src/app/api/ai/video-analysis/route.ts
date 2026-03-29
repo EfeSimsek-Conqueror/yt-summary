@@ -86,7 +86,7 @@ function mapTranscriptError(e: unknown): { status: number; message: string } {
 
 /**
  * POST /api/ai/video-analysis
- * Flow: fetch timed captions (youtube-transcript + Innertube caption URLs) → LLM analysis.
+ * Flow: fetch transcript via Deepgram (yt-dlp audio → API) → LLM analysis.
  * Optional `transcriptPlain` only when automatic fetch returns nothing.
  */
 export async function POST(request: NextRequest) {
