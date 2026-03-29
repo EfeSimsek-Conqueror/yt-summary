@@ -55,6 +55,31 @@ function withTimeout<T>(
   });
 }
 
+/** youtubei.js segment shapes drift between versions — extract text/timing loosely. */
+function transcriptSegmentToRow(seg: unknown): TranscriptResponse | null {
+  if (!seg || typeof seg !== "object") return null;
+  const o = seg as Record<string, unknown>;
+  const startMs = parseInt(String(o.start_ms ?? ""), 10);
+  const endMs = parseInt(String(o.end_ms ?? ""), 10);
+  let text = "";
+  if (o.snippet != null && typeof (o.snippet as { toString?: () => string }).toString === "function") {
+    text = (o.snippet as { toString: () => string }).toString().trim();
+  }
+  if (!text && Array.isArray(o.runs)) {
+    text = (o.runs as { text?: string }[])
+      .map((r) => r?.text ?? "")
+      .join("")
+      .trim();
+  }
+  if (!text) return null;
+  const startSec = Number.isFinite(startMs) ? startMs / 1000 : 0;
+  const durSec =
+    Number.isFinite(endMs) && Number.isFinite(startMs)
+      ? Math.max(0, (endMs - startMs) / 1000)
+      : 0;
+  return { text, offset: startSec, duration: durSec };
+}
+
 async function fetchTranscriptViaYoutubei(
   videoIdRaw: string,
 ): Promise<TranscriptResponse[]> {
@@ -73,31 +98,76 @@ async function fetchTranscriptViaYoutubei(
 
   const out: TranscriptResponse[] = [];
   for (const seg of segments) {
-    if (seg.type !== "TranscriptSegment") continue;
-    const s = seg as {
-      start_ms: string;
-      end_ms: string;
-      snippet: { toString(): string };
-    };
-    const startMs = parseInt(s.start_ms, 10);
-    const endMs = parseInt(s.end_ms, 10);
-    const text = s.snippet.toString().trim();
-    if (!text) continue;
-    const startSec = Number.isFinite(startMs) ? startMs / 1000 : 0;
-    const durSec = Number.isFinite(endMs)
-      ? Math.max(0, (endMs - startMs) / 1000)
-      : 0;
-    out.push({
-      text,
-      offset: startSec,
-      duration: durSec,
-    });
+    if (
+      seg &&
+      typeof seg === "object" &&
+      (seg as { type?: string }).type === "TranscriptSegment"
+    ) {
+      const s = seg as {
+        start_ms: string;
+        end_ms: string;
+        snippet: { toString(): string };
+      };
+      const startMs = parseInt(s.start_ms, 10);
+      const endMs = parseInt(s.end_ms, 10);
+      const text = s.snippet.toString().trim();
+      if (!text) continue;
+      const startSec = Number.isFinite(startMs) ? startMs / 1000 : 0;
+      const durSec = Number.isFinite(endMs)
+        ? Math.max(0, (endMs - startMs) / 1000)
+        : 0;
+      out.push({ text, offset: startSec, duration: durSec });
+    } else {
+      const row = transcriptSegmentToRow(seg);
+      if (row) out.push(row);
+    }
   }
 
   if (out.length === 0) {
     throw new YoutubeTranscriptNotAvailableError(id);
   }
   return out;
+}
+
+/**
+ * YouTube often omits `captionTracks` in server-side HTML unless a language is requested.
+ * Tries common tracks after the default fetch failed (false "disabled" in the UI).
+ */
+async function fetchTranscriptWithLanguageFallbacks(
+  videoIdRaw: string,
+): Promise<TranscriptResponse[]> {
+  const id = parseYoutubeVideoId(videoIdRaw) ?? videoIdRaw.trim();
+  const langTries: Array<{ lang: string }> = [
+    { lang: "en" },
+    { lang: "en-US" },
+    { lang: "tr" },
+    { lang: "de" },
+    { lang: "fr" },
+    { lang: "es" },
+  ];
+  let lastErr: unknown;
+  for (const cfg of langTries) {
+    try {
+      const rows = await withTimeout(
+        fetchTranscript(videoIdRaw, cfg),
+        FETCH_TRANSCRIPT_TIMEOUT_MS,
+        id,
+        false,
+      );
+      if (rows?.length) {
+        console.warn(
+          `[video-analysis] transcript language fallback ok (${cfg.lang})`,
+          id,
+        );
+        return rows;
+      }
+    } catch (e) {
+      lastErr = e;
+      if (e instanceof YoutubeTranscriptTooManyRequestError) throw e;
+    }
+  }
+  if (lastErr) throw lastErr;
+  return [];
 }
 
 /** Retries 2..N after the first attempt already failed with rate limit. */
@@ -175,6 +245,26 @@ export async function fetchTranscriptRobust(
     return fromY;
   }
 
+  try {
+    const viaLang = await fetchTranscriptWithLanguageFallbacks(videoIdRaw);
+    if (viaLang.length > 0) {
+      return viaLang;
+    }
+  } catch (e) {
+    if (e instanceof YoutubeTranscriptTooManyRequestError) {
+      try {
+        return await fetchTranscriptRateLimitRetries(videoIdRaw);
+      } catch (retryErr) {
+        console.warn(
+          "[video-analysis] youtubei.js transcript fallback failed",
+          parseYoutubeVideoId(videoIdRaw) ?? videoIdRaw,
+          errY,
+        );
+        throw retryErr;
+      }
+    }
+  }
+
   if (errT instanceof YoutubeTranscriptTooManyRequestError) {
     try {
       return await fetchTranscriptRateLimitRetries(videoIdRaw);
@@ -201,7 +291,7 @@ export async function fetchTranscriptRobust(
   }
   if (errT || errY) {
     console.warn(
-      "[video-analysis] transcript fetch failed (non-library error); trying AI path",
+      "[video-analysis] transcript fetch failed after fallbacks",
       vid,
       errT,
       errY,

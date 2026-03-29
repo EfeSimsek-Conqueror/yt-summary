@@ -43,7 +43,11 @@ function mapTranscriptError(e: unknown): { status: number; message: string } {
     return { status: 404, message: "Video is unavailable." };
   }
   if (e instanceof YoutubeTranscriptDisabledError) {
-    return { status: 422, message: "Captions are disabled for this video." };
+    return {
+      status: 422,
+      message:
+        "Could not load captions from YouTube (automatic fetch). The video may still show subtitles in the app — try again, another language on YouTube, or paste transcriptPlain.",
+    };
   }
   if (e instanceof YoutubeTranscriptNotAvailableLanguageError) {
     return {

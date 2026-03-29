@@ -40,8 +40,11 @@ function segmentAnalysisBlockedReason(error: string): string {
   if (error.includes("could not access speech")) {
     return "AI could not read speech from this video (blocked, no speech, or model limits). Try another video or run analysis again later.";
   }
-  if (error.includes("Captions are disabled")) {
-    return "YouTube captions are disabled; we tried AI transcription from the video. If analysis still failed, see the error above or try again later.";
+  if (
+    error.includes("Captions are disabled") ||
+    error.includes("Could not load captions from YouTube")
+  ) {
+    return "YouTube did not return captions to our server (they may still appear in the player). Try again, open captions on the video, or paste text if the app supports it.";
   }
   if (error.includes("No captions available")) {
     return "No YouTube captions were found; we tried AI transcription from the video. If it still failed, see the error above.";
