@@ -27,8 +27,8 @@ function getYtDlpBinary(): string {
 }
 
 /**
- * Sunucu/datacenter IP’lerinde YouTube sık “Sign in to confirm you’re not a bot” döner.
- * Android/tv_embedded istemcileri çoğu zaman çerez olmadan işe yarar; kalıcı çözüm: çerez.
+ * Sunucu/datacenter IP'lerinde YouTube sık "Sign in to confirm you're not a bot" döner.
+ * Kalici cozum: cerez. YOUTUBE_COOKIES veya YOUTUBE_COOKIES_PATH env ile saglanir.
  */
 function youtubeCookieFileForYtDlp(dir: string): Promise<string | undefined> {
   const pathEnv = process.env.YOUTUBE_COOKIES_PATH?.trim();
@@ -43,12 +43,19 @@ function youtubeCookieFileForYtDlp(dir: string): Promise<string | undefined> {
   return Promise.resolve(undefined);
 }
 
+/**
+ * Extractor fallback listesi.
+ * tv_embedded artik desteklenmiyor (Skipping unsupported client).
+ * mweb ve android_vr genellikle bot kontrolunden geciyor.
+ * YTDLP_YOUTUBE_EXTRACTOR_ARGS env ile override edilebilir.
+ */
 function defaultYoutubeExtractorFallbacks(): string[] {
   const one = process.env.YTDLP_YOUTUBE_EXTRACTOR_ARGS?.trim();
   if (one) return [one];
   return [
     "youtube:player_client=android",
-    "youtube:player_client=tv_embedded",
+    "youtube:player_client=mweb",
+    "youtube:player_client=android_vr",
   ];
 }
 
@@ -101,20 +108,16 @@ function deepgramResponseToRows(res: ListenV1Response): TranscriptResponse[] {
     }
     if (rows.length > 0) return rows;
   }
-
   const alt = res.results?.channels?.[0]?.alternatives?.[0];
   if (!alt) return [];
-
   const tr = alt.transcript?.trim() ?? "";
   if (tr.length > 0) {
     return [{ text: tr, offset: 0, duration: 1, lang: "en" }];
   }
-
   const paraTr = alt.paragraphs?.transcript?.trim();
   if (paraTr) {
     return [{ text: paraTr, offset: 0, duration: 1, lang: "en" }];
   }
-
   const pItems = alt.paragraphs?.paragraphs;
   if (Array.isArray(pItems)) {
     const rows: TranscriptResponse[] = [];
@@ -122,8 +125,7 @@ function deepgramResponseToRows(res: ListenV1Response): TranscriptResponse[] {
       const sentences = p?.sentences;
       if (!Array.isArray(sentences)) continue;
       for (const s of sentences) {
-        const text =
-          typeof s?.text === "string" ? s.text.trim() : "";
+        const text = typeof s?.text === "string" ? s.text.trim() : "";
         if (!text) continue;
         const start = typeof s.start === "number" ? s.start : 0;
         const end = typeof s.end === "number" ? s.end : start;
@@ -137,7 +139,6 @@ function deepgramResponseToRows(res: ListenV1Response): TranscriptResponse[] {
     }
     if (rows.length > 0) return rows;
   }
-
   const words = alt.words;
   if (Array.isArray(words) && words.length > 0) {
     const stitched = words
@@ -148,8 +149,7 @@ function deepgramResponseToRows(res: ListenV1Response): TranscriptResponse[] {
     if (stitched.length > 0) {
       const t0 = typeof words[0]?.start === "number" ? words[0]!.start! : 0;
       const last = words[words.length - 1];
-      const t1 =
-        typeof last?.end === "number" ? last.end : t0;
+      const t1 = typeof last?.end === "number" ? last.end : t0;
       return [
         {
           text: stitched,
@@ -160,29 +160,33 @@ function deepgramResponseToRows(res: ListenV1Response): TranscriptResponse[] {
       ];
     }
   }
-
   return [];
 }
 
 async function downloadYoutubeAudioMp3(videoId: string): Promise<Buffer> {
   const url = `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
   const dir = await mkdtemp(join(tmpdir(), "vidsum-yt-"));
-  /** `bestaudio` doğrudan indirir (çoğu formatta ffmpeg gerekmez); Deepgram m4a/webm kabul eder. */
+  /** `bestaudio` dogrudan indirir; Deepgram m4a/webm kabul eder. */
   const outTemplate = join(dir, "audio.%(ext)s");
   const ytdlp = getYtDlpBinary();
   try {
     const cookieFile = await youtubeCookieFileForYtDlp(dir);
     const extractors = defaultYoutubeExtractorFallbacks();
     let lastErr: Error | undefined;
-
     for (let i = 0; i < extractors.length; i++) {
       const extractor = extractors[i]!;
       const args: string[] = ["--extractor-args", extractor];
       if (cookieFile) args.push("--cookies", cookieFile);
+      // Bot tespitini azaltmak icin gercek tarayici UA
+      args.push(
+        "--add-header",
+        "User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      );
       args.push(
         "-f",
         "bestaudio",
         "--no-playlist",
+        "--no-check-certificate",
         "-o",
         outTemplate,
         url,
@@ -214,7 +218,6 @@ async function downloadYoutubeAudioMp3(videoId: string): Promise<Buffer> {
         throw lastErr;
       }
     }
-
     const names = await readdir(dir);
     const audio = names.find((n) => n.startsWith("audio."));
     if (!audio) {
@@ -229,15 +232,14 @@ async function downloadYoutubeAudioMp3(videoId: string): Promise<Buffer> {
 /**
  * Download audio with yt-dlp, transcribe with Deepgram. Requires `DEEPGRAM_API_KEY`
  * and `yt-dlp` on the server (`nixpacks.toml` and/or `postinstall` script).
- * YouTube bot duvarı için: varsayılan `player_client=android` → sonra `tv_embedded`.
- * Kalıcı çözüm: Netscape çerezleri `YOUTUBE_COOKIES` (içerik) veya `YOUTUBE_COOKIES_PATH` (dosya).
+ * YouTube bot duvarı icin: android -> mweb -> android_vr fallback.
+ * Kalici cozum: Netscape cerezleri `YOUTUBE_COOKIES` (icerik) veya `YOUTUBE_COOKIES_PATH` (dosya).
  */
 export async function fetchTranscriptViaDeepgram(
   videoId: string,
 ): Promise<TranscriptResponse[]> {
   const apiKey = getDeepgramApiKey();
   if (!apiKey) return [];
-
   let buffer: Buffer;
   try {
     buffer = await downloadYoutubeAudioMp3(videoId);
@@ -250,7 +252,6 @@ export async function fetchTranscriptViaDeepgram(
     );
     throw e;
   }
-
   if (buffer.length < 64) {
     console.warn(
       "[video-analysis] transcript: deepgram audio file too small",
@@ -259,14 +260,9 @@ export async function fetchTranscriptViaDeepgram(
     );
     return [];
   }
-
-  const model =
-    process.env.DEEPGRAM_MODEL?.trim() || "nova-2";
-  const language =
-    process.env.DEEPGRAM_LANGUAGE?.trim() || "en";
-
+  const model = process.env.DEEPGRAM_MODEL?.trim() || "nova-2";
+  const language = process.env.DEEPGRAM_LANGUAGE?.trim() || "en";
   const client = new DeepgramClient({ apiKey });
-
   let res: ListenV1Response;
   try {
     const response = await client.listen.v1.media.transcribeFile(
@@ -290,7 +286,6 @@ export async function fetchTranscriptViaDeepgram(
     );
     throw e;
   }
-
   const rows = deepgramResponseToRows(res);
   if (rows.length === 0) {
     const ch = res.results?.channels?.length ?? 0;
