@@ -1,7 +1,8 @@
 import { DeepgramClient } from "@deepgram/sdk";
 import type { ListenV1Response } from "@deepgram/sdk";
 import { spawn } from "child_process";
-import { mkdtemp, readFile, rm } from "fs/promises";
+import { existsSync } from "fs";
+import { mkdtemp, readdir, readFile, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import type { TranscriptResponse } from "youtube-transcript";
@@ -13,6 +14,17 @@ export function getDeepgramApiKey(): string | undefined {
 
 const YTDLP_TIMEOUT_MS = 8 * 60 * 1000;
 const DEEPGRAM_TIMEOUT_SEC = 600;
+
+/** PATH, `YTDLP_PATH`, veya `postinstall` ile indirilen `node_modules/.bin/yt-dlp`. */
+function getYtDlpBinary(): string {
+  const fromEnv = process.env.YTDLP_PATH?.trim();
+  if (fromEnv) return fromEnv;
+  for (const root of [process.cwd(), join(process.cwd(), "..")]) {
+    const p = join(root, "node_modules", ".bin", "yt-dlp");
+    if (existsSync(p)) return p;
+  }
+  return "yt-dlp";
+}
 
 function deepgramResponseToRows(res: ListenV1Response): TranscriptResponse[] {
   const utterances = res.results?.utterances;
@@ -98,22 +110,14 @@ function deepgramResponseToRows(res: ListenV1Response): TranscriptResponse[] {
 async function downloadYoutubeAudioMp3(videoId: string): Promise<Buffer> {
   const url = `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
   const dir = await mkdtemp(join(tmpdir(), "vidsum-yt-"));
-  const out = join(dir, "audio.mp3");
+  /** `bestaudio` doğrudan indirir (çoğu formatta ffmpeg gerekmez); Deepgram m4a/webm kabul eder. */
+  const outTemplate = join(dir, "audio.%(ext)s");
+  const ytdlp = getYtDlpBinary();
   try {
     await new Promise<void>((resolve, reject) => {
       const child = spawn(
-        "yt-dlp",
-        [
-          "-f",
-          "bestaudio/best",
-          "-x",
-          "--audio-format",
-          "mp3",
-          "--no-playlist",
-          "-o",
-          out,
-          url,
-        ],
+        ytdlp,
+        ["-f", "bestaudio", "--no-playlist", "-o", outTemplate, url],
         { stdio: ["ignore", "pipe", "pipe"] },
       );
       let stderr = "";
@@ -139,7 +143,12 @@ async function downloadYoutubeAudioMp3(videoId: string): Promise<Buffer> {
           );
       });
     });
-    return await readFile(out);
+    const names = await readdir(dir);
+    const audio = names.find((n) => n.startsWith("audio."));
+    if (!audio) {
+      throw new Error(`yt-dlp produced no audio.* file in ${dir}`);
+    }
+    return await readFile(join(dir, audio));
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -147,7 +156,7 @@ async function downloadYoutubeAudioMp3(videoId: string): Promise<Buffer> {
 
 /**
  * Download audio with yt-dlp, transcribe with Deepgram. Requires `DEEPGRAM_API_KEY`
- * and `yt-dlp` + `ffmpeg` on the server (see `nixpacks.toml`).
+ * and `yt-dlp` on the server (`nixpacks.toml` and/or `postinstall` script).
  */
 export async function fetchTranscriptViaDeepgram(
   videoId: string,
