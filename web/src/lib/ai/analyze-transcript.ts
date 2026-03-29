@@ -8,7 +8,16 @@ const segmentSchema = z.object({
   start_sec: z.number().nonnegative(),
   end_sec: z.number().nonnegative(),
   title: z.string().optional(),
-  speakers: z.array(z.string()).max(8).optional(),
+  /** Model often lists >8 names in panels/debates — trim so parsing never fails. */
+  speakers: z.preprocess(
+    (v) =>
+      Array.isArray(v)
+        ? v
+            .filter((x): x is string => typeof x === "string")
+            .slice(0, 8)
+        : v,
+    z.array(z.string()).max(8).optional(),
+  ),
   /** Atmosphere: romantic, comedy, action, tense, dramatic, educational, calm, sad, inspiring, neutral */
   mood: z.string().max(40).optional(),
   bullets: z.array(z.string()),
