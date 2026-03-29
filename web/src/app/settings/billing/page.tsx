@@ -1,4 +1,4 @@
-import { PLANS } from "@/lib/billing/plans";
+import { formatPlanPrice, PLANS } from "@/lib/billing/plans";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 
@@ -37,6 +37,9 @@ export default function BillingPage() {
                 {plan.displayName}
               </p>
               <p className="mt-1 text-sm text-muted">{creditsDetail}</p>
+              <p className="mt-2 text-sm font-medium text-white">
+                {formatPlanPrice(plan)}
+              </p>
               <p className="mt-2 text-xs text-gray-500">
                 Usage: 3 credits per 5 minutes of analyzed video.
               </p>

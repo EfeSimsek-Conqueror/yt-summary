@@ -16,8 +16,9 @@ export type PlanDefinition = {
   /** Credits included: Scout = one-time pool; paid tiers = per month */
   creditsIncluded: number;
   creditsPeriod: "once" | "month";
-  /** Shown on pricing cards (e.g. "$19") */
+  /** Main price line (e.g. "$0", "$15") */
   priceLabel: string;
+  /** Suffix next to price (e.g. " · forever", "/month") */
   priceSubtext: string;
   /** Highlight middle tier */
   popular?: boolean;
@@ -31,7 +32,7 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     creditsIncluded: 5,
     creditsPeriod: "once",
     priceLabel: "$0",
-    priceSubtext: "/month",
+    priceSubtext: " · forever",
   },
   navigator: {
     id: "navigator",
@@ -39,7 +40,7 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     shortName: "Navigator",
     creditsIncluded: 60,
     creditsPeriod: "month",
-    priceLabel: "$19",
+    priceLabel: "$12",
     priceSubtext: "/month",
     popular: true,
   },
@@ -49,9 +50,14 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     shortName: "Captain",
     creditsIncluded: 180,
     creditsPeriod: "month",
-    priceLabel: "$49",
+    priceLabel: "$25",
     priceSubtext: "/month",
   },
 };
+
+/** Single line for billing UI (e.g. "$15/month" or "$0 · forever") */
+export function formatPlanPrice(plan: PlanDefinition): string {
+  return `${plan.priceLabel}${plan.priceSubtext}`;
+}
 
 export const PLAN_ORDER: PlanId[] = ["scout", "navigator", "captain"];
