@@ -12,8 +12,6 @@ import {
   youtubeLikeFetch,
 } from "./youtube-transcript-fetch";
 
-const TRANSCRIPT_RATE_LIMIT_RETRIES = 5;
-const TRANSCRIPT_RATE_LIMIT_BASE_DELAY_MS = 3000;
 /** Space out language fallback attempts (same IP bursts trigger reCAPTCHA). */
 const LANG_FALLBACK_GAP_MS = 400;
 
@@ -45,7 +43,8 @@ async function recoverFromRateLimit(
   vid: string,
   original: YoutubeTranscriptTooManyRequestError,
 ): Promise<TranscriptResponse[]> {
-  const cooldownsMs = [4000, 9000, 16000];
+  /** Short cooldowns only — long multi-minute retries made the UI sit at ~95% then fail. */
+  const cooldownsMs = [2500, 5500];
   for (let i = 0; i < cooldownsMs.length; i++) {
     await delay(cooldownsMs[i]!);
     try {
@@ -346,38 +345,6 @@ async function fetchTranscriptWithLanguageFallbacks(
   return [];
 }
 
-/** Last resort: long backoff + `youtube-transcript` only (watch page). */
-async function fetchTranscriptRateLimitRetries(
-  videoId: string,
-): Promise<TranscriptResponse[]> {
-  const id = parseYoutubeVideoId(videoId) ?? videoId.trim();
-  for (let attempt = 1; attempt <= TRANSCRIPT_RATE_LIMIT_RETRIES; attempt++) {
-    const delayMs = TRANSCRIPT_RATE_LIMIT_BASE_DELAY_MS * 2 ** (attempt - 1);
-    console.warn(
-      `[video-analysis] transcript: rate-limit backoff retry ${attempt}/${TRANSCRIPT_RATE_LIMIT_RETRIES} in ${delayMs}ms`,
-    );
-    await delay(delayMs);
-    try {
-      const rows = await withTimeout(
-        fetchTranscript(videoId, transcriptFetchOpts),
-        FETCH_TRANSCRIPT_TIMEOUT_MS,
-        id,
-        false,
-      );
-      if (rows.length > 0) return rows;
-    } catch (e) {
-      if (
-        e instanceof YoutubeTranscriptTooManyRequestError &&
-        attempt < TRANSCRIPT_RATE_LIMIT_RETRIES
-      ) {
-        continue;
-      }
-      throw e;
-    }
-  }
-  throw new YoutubeTranscriptTooManyRequestError();
-}
-
 /**
  * Sequential: Innertube caption URLs first (no watch-page reCAPTCHA), then
  * `youtube-transcript`. Parallel was hammering YouTube and triggering rate limits.
@@ -413,11 +380,7 @@ export async function fetchTranscriptRobust(
     if (fromT.length > 0) return fromT;
   } catch (e) {
     if (e instanceof YoutubeTranscriptTooManyRequestError) {
-      try {
-        return await recoverFromRateLimit(videoIdRaw, vid, e);
-      } catch {
-        return await fetchTranscriptRateLimitRetries(videoIdRaw);
-      }
+      return await recoverFromRateLimit(videoIdRaw, vid, e);
     }
     if (e instanceof YoutubeTranscriptVideoUnavailableError) throw e;
   }
@@ -427,11 +390,7 @@ export async function fetchTranscriptRobust(
     if (viaLang.length > 0) return viaLang;
   } catch (e) {
     if (e instanceof YoutubeTranscriptTooManyRequestError) {
-      try {
-        return await recoverFromRateLimit(videoIdRaw, vid, e);
-      } catch {
-        return await fetchTranscriptRateLimitRetries(videoIdRaw);
-      }
+      return await recoverFromRateLimit(videoIdRaw, vid, e);
     }
     throw e;
   }

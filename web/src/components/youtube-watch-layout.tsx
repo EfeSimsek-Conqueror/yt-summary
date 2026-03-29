@@ -199,6 +199,8 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
   /** Start time for estimated progress (API does not stream real %). */
   const analysisProgressStartedRef = useRef<number>(0);
   const [analysisProgressPct, setAnalysisProgressPct] = useState(0);
+  /** True after ~22s so we don't pretend we're stuck at one fake %. */
+  const [analysisProgressSlow, setAnalysisProgressSlow] = useState(false);
 
   const canEmbed = isLikelyYoutubeVideoId(video.id);
 
@@ -303,21 +305,32 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
     }
   }, []);
 
-  /** Asymptotic 0→95% while waiting; not from the server (single request has no progress events). */
+  /**
+   * Fake progress only (API has no streaming %). Cap ~90% early, then crawl toward 98%
+   * so long transcript retries don't look "frozen at 95%".
+   */
   useEffect(() => {
     if (!analysisBusy) {
       setAnalysisProgressPct(0);
+      setAnalysisProgressSlow(false);
       return;
     }
     analysisProgressStartedRef.current = Date.now();
     setAnalysisProgressPct(0);
+    setAnalysisProgressSlow(false);
     const tick = () => {
       const elapsedSec =
         (Date.now() - analysisProgressStartedRef.current) / 1000;
-      const pct = Math.min(
-        95,
-        Math.floor(100 * (1 - Math.exp(-elapsedSec / 22))),
-      );
+      setAnalysisProgressSlow(elapsedSec > 22);
+      let pct: number;
+      if (elapsedSec < 40) {
+        pct = Math.min(
+          90,
+          Math.floor(100 * (1 - Math.exp(-elapsedSec / 24))),
+        );
+      } else {
+        pct = Math.min(98, 90 + Math.floor((elapsedSec - 40) / 12));
+      }
       setAnalysisProgressPct(pct);
     };
     tick();
@@ -593,6 +606,13 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
                     </span>
                     <span className="opacity-75"> · estimated</span>
                   </p>
+                  {analysisProgressSlow ? (
+                    <p className="text-[11px] leading-snug text-muted">
+                      Still working — fetching captions or retrying can take a
+                      while. If YouTube rate-limits the server, you’ll get an
+                      error you can retry after a few minutes.
+                    </p>
+                  ) : null}
                 </div>
               </div>
             ) : !hasAnalysisSegments && segments.length === 0 ? (
@@ -828,6 +848,12 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
                   </span>
                   <span className="opacity-75"> · estimated</span>
                 </p>
+                {analysisProgressSlow ? (
+                  <p className="text-[11px] leading-snug text-muted">
+                    Still working — caption fetch or retries may take a while
+                    before the AI step.
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </div>
