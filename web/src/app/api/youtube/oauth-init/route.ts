@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { spawn } from "child_process";
 import { existsSync } from "fs";
 import { join } from "path";
@@ -13,7 +13,6 @@ function getYtDlpBinary(): string {
   return "yt-dlp";
 }
 
-// In-memory store for the ongoing oauth process output
 let oauthState: {
   verificationUrl?: string;
   userCode?: string;
@@ -25,20 +24,54 @@ let oauthState: {
 let oauthProcess: ReturnType<typeof spawn> | null = null;
 
 function parseOAuthOutput(text: string): void {
-  // yt-dlp prints: Please open https://www.google.com/device and enter code XXXX-XXXX
   const urlMatch = text.match(/Please open (https?:\/\/[^\s]+)/);
   if (urlMatch) oauthState.verificationUrl = urlMatch[1];
-  const codeMatch = text.match(/enter(?:\s+the)?(?:\s+code)?:?\s+([A-Z0-9]{4}-[A-Z0-9]{4})/i);
+  const codeMatch = text.match(/code[:\s]+([A-Z0-9]{4}-[A-Z0-9]{4})/i);
   if (codeMatch) oauthState.userCode = codeMatch[1];
 }
 
+const HTML_PAGE = `<!DOCTYPE html>
+<html>
+<head><title>YouTube OAuth2 Init</title>
+<style>body{font-family:sans-serif;max-width:600px;margin:40px auto;padding:20px;background:#111;color:#eee}
+button{background:#f00;color:#fff;border:none;padding:12px 24px;font-size:16px;cursor:pointer;border-radius:6px}
+a{color:#4af}pre{background:#222;padding:16px;border-radius:6px;overflow-x:auto;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<h1>YouTube OAuth2 Setup</h1>
+<p>Bu sayfa Railway'deki yt-dlp'ye Google hesabi erisimi verir. Bir kez yeterli.</p>
+<form method="POST">
+  <button type="submit">OAuth2 Flow Baslat</button>
+</form>
+<div id="result"></div>
+<script>
+document.querySelector('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  document.getElementById('result').innerHTML = '<p>Baslatiyor...</p>';
+  const res = await fetch('/api/youtube/oauth-init', {method:'POST'});
+  const data = await res.json();
+  let html = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+  if (data.verificationUrl) {
+    html = '<h2>Adim 1: Asagidaki linke tiklayip Google hesabini sec</h2>' +
+      '<p><a href="' + data.verificationUrl + '" target="_blank">' + data.verificationUrl + '</a></p>' +
+      (data.userCode ? '<h2>Adim 2: Bu kodu gir: <code>' + data.userCode + '</code></h2>' : '') +
+      '<p>Onayladiktan sonra yt-dlp tokeni kaydeder. Sayfayi yenilemene gerek yok.</p>';
+  } else if (data.error) {
+    html = '<p style="color:red">Hata: ' + data.error + '</p><pre>' + data.output + '</pre>';
+  }
+  document.getElementById('result').innerHTML = html;
+});
+</script>
+</body></html>`;
+
 export async function GET() {
-  // Return current state
-  return NextResponse.json(oauthState);
+  return new NextResponse(HTML_PAGE, {
+    headers: { "Content-Type": "text/html" },
+  });
 }
 
-export async function POST() {
-  // Reset state
+export async function POST(_req: NextRequest) {
   if (oauthProcess) {
     try { oauthProcess.kill(); } catch {}
     oauthProcess = null;
@@ -46,9 +79,6 @@ export async function POST() {
   oauthState = { done: false, output: "" };
 
   const ytdlp = getYtDlpBinary();
-
-  // Run yt-dlp with oauth2 - it will print a verification URL and wait
-  // We use a dummy URL just to trigger the auth flow
   const args = [
     "--username", "oauth2",
     "--password", "",
@@ -78,7 +108,7 @@ export async function POST() {
       if (code !== 0 && !oauthState.verificationUrl) {
         oauthState.error = `yt-dlp exited ${code}`;
       }
-      console.log("[oauth-init] yt-dlp process ended, code:", code);
+      console.log("[oauth-init] done, code:", code);
       oauthProcess = null;
     });
 
@@ -88,8 +118,7 @@ export async function POST() {
       oauthProcess = null;
     });
 
-    // Wait up to 15s for the verification URL to appear
-    const deadline = Date.now() + 15000;
+    const deadline = Date.now() + 20000;
     while (!oauthState.verificationUrl && !oauthState.done && Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 500));
     }
