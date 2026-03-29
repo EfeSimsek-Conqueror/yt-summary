@@ -21,3 +21,8 @@ export function parseYoutubeVideoId(input: string): string | null {
   }
   return null;
 }
+
+/** Canonical watch URL for APIs (e.g. Supadata `url` query param). */
+export function youtubeWatchUrl(videoId: string): string {
+  return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
+}

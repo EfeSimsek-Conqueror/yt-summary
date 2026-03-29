@@ -19,7 +19,7 @@ import {
   YoutubeTranscriptVideoUnavailableError,
 } from "youtube-transcript";
 
-/** Caption fetch (incl. optional yt-dlp + Deepgram) + analysis LLM call. */
+/** Transcript via Supadata + analysis LLM call. */
 export const maxDuration = 900;
 
 const MIN_TRANSCRIPT_PLAIN_CHARS = 400;
@@ -40,7 +40,7 @@ function mapTranscriptError(e: unknown): { status: number; message: string } {
     return {
       status: 429,
       message:
-        "YouTube is rate-limiting caption requests from this server, and optional audio→Deepgram transcription is not configured (set DEEPGRAM_API_KEY) or also failed. Wait several minutes before retrying the same video; successful captions are cached for a while.",
+        "Transcript request was rate-limited (Supadata quota). Wait and retry; successful transcripts are cached for a while.",
     };
   }
   if (e instanceof YoutubeTranscriptVideoUnavailableError) {
@@ -86,7 +86,7 @@ function mapTranscriptError(e: unknown): { status: number; message: string } {
 
 /**
  * POST /api/ai/video-analysis
- * Flow: fetch transcript via Deepgram (yt-dlp audio → API) → LLM analysis.
+ * Flow: fetch transcript via Supadata → LLM analysis.
  * Optional `transcriptPlain` only when automatic fetch returns nothing.
  */
 export async function POST(request: NextRequest) {

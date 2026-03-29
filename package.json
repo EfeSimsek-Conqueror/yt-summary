@@ -5,7 +5,6 @@
     "node": ">=20"
   },
   "scripts": {
-    "postinstall": "node web/scripts/download-ytdlp.mjs",
     "build": "npm ci --prefix web && npm run build --prefix web",
     "start": "npm run start --prefix web"
   }

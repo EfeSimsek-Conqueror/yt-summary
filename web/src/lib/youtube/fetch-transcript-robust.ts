@@ -2,11 +2,11 @@ import type { TranscriptResponse } from "youtube-transcript";
 import { YoutubeTranscriptNotAvailableError } from "youtube-transcript";
 import { parseYoutubeVideoId } from "./video-id";
 import {
-  fetchTranscriptViaDeepgram,
-  getDeepgramApiKey,
-} from "./transcript-via-deepgram";
+  fetchTranscriptViaSupadata,
+  getSupadataApiKey,
+} from "./transcript-via-supadata";
 
-/** Reuse transcript for the same video to avoid repeat downloads. */
+/** Reuse transcript for the same video to avoid repeat API calls. */
 const TRANSCRIPT_CACHE_TTL_MS = 45 * 60 * 1000;
 const TRANSCRIPT_CACHE_MAX = 150;
 const transcriptCache = new Map<
@@ -30,8 +30,7 @@ function trimTranscriptCache() {
   }
 }
 
-/** yt-dlp download + Deepgram prerecorded. */
-const DEEPGRAM_FETCH_TIMEOUT_MS = 14 * 60 * 1000;
+const SUPADATA_FETCH_TIMEOUT_MS = 15 * 60 * 1000;
 
 function withTimeout<T>(
   promise: Promise<T>,
@@ -56,8 +55,8 @@ function withTimeout<T>(
 }
 
 /**
- * Transcript source: **Deepgram only** (yt-dlp → prerecorded API).
- * Requires `DEEPGRAM_API_KEY` and `yt-dlp` + `ffmpeg` on the server.
+ * Transcript source: **Supadata only** (`GET /v1/transcript`).
+ * Requires `SUPADATA_API_KEY` (https://supadata.ai).
  */
 async function fetchTranscriptOnce(
   videoIdRaw: string,
@@ -67,36 +66,32 @@ async function fetchTranscriptOnce(
     throw new YoutubeTranscriptNotAvailableError(vid);
   }
 
-  if (!getDeepgramApiKey()) {
+  if (!getSupadataApiKey()) {
     throw new Error(
-      "DEEPGRAM_API_KEY is not configured on the server. Transcription requires Deepgram.",
+      "SUPADATA_API_KEY is not configured on the server. Transcripts require Supadata.",
     );
   }
 
   try {
     const rows = await withTimeout(
-      fetchTranscriptViaDeepgram(vid),
-      DEEPGRAM_FETCH_TIMEOUT_MS,
+      fetchTranscriptViaSupadata(vid),
+      SUPADATA_FETCH_TIMEOUT_MS,
       vid,
     );
     if (rows.length > 0) {
-      console.warn("[video-analysis] transcript: deepgram ok", vid);
       return rows;
     }
-    console.warn(
-      "[video-analysis] transcript: deepgram returned no rows",
-      vid,
-    );
+    console.warn("[video-analysis] transcript: supadata returned no rows", vid);
   } catch (e) {
     if (e instanceof YoutubeTranscriptNotAvailableError) {
       console.warn(
-        "[video-analysis] transcript: deepgram timed out or unavailable",
+        "[video-analysis] transcript: supadata timed out or unavailable",
         vid,
       );
       throw e;
     }
     const msg = e instanceof Error ? e.message : String(e);
-    console.warn("[video-analysis] transcript: deepgram failed", vid, msg);
+    console.warn("[video-analysis] transcript: supadata failed", vid, msg);
     throw e;
   }
 

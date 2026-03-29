@@ -1,5 +1,3 @@
-# Repo kökünden deploy ediyorsan ayrıca ../../nixpacks.toml gerekir (monorepo).
-# yt-dlp + ffmpeg: Deepgram için ses indirme; ayrıca `npm postinstall` ikili indirir (transcript-via-deepgram.ts).
-# "..." keeps Nixpacks’ default setup packages (Node/npm toolchain); without it, npm ci can fail.
+# Transcript: Supadata API (`SUPADATA_API_KEY`); ek sistem paketi gerekmez.
 [phases.setup]
-nixPkgs = ["...", "yt-dlp", "ffmpeg", "deno"]
+nixPkgs = ["..."]
