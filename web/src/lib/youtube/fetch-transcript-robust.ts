@@ -15,6 +15,30 @@ import {
 /** Space out language fallback attempts (same IP bursts trigger reCAPTCHA). */
 const LANG_FALLBACK_GAP_MS = 400;
 
+/** Reuse transcript for the same video to avoid repeat YouTube hits (rate limits). */
+const TRANSCRIPT_CACHE_TTL_MS = 45 * 60 * 1000;
+const TRANSCRIPT_CACHE_MAX = 150;
+const transcriptCache = new Map<
+  string,
+  { rows: TranscriptResponse[]; expires: number }
+>();
+const transcriptInflight = new Map<string, Promise<TranscriptResponse[]>>();
+
+function trimTranscriptCache() {
+  while (transcriptCache.size > TRANSCRIPT_CACHE_MAX) {
+    let oldest: string | undefined;
+    let oldestExp = Infinity;
+    for (const [k, v] of transcriptCache) {
+      if (v.expires < oldestExp) {
+        oldestExp = v.expires;
+        oldest = k;
+      }
+    }
+    if (oldest) transcriptCache.delete(oldest);
+    else break;
+  }
+}
+
 /** `youtube-transcript` is usually fast; cap so we never block the whole request forever. */
 const FETCH_TRANSCRIPT_TIMEOUT_MS = 22_000;
 /** Innertube: multiple `getInfo` clients + caption fetches (no `/get_transcript`). */
@@ -349,7 +373,7 @@ async function fetchTranscriptWithLanguageFallbacks(
  * Sequential: Innertube caption URLs first (no watch-page reCAPTCHA), then
  * `youtube-transcript`. Parallel was hammering YouTube and triggering rate limits.
  */
-export async function fetchTranscriptRobust(
+async function fetchTranscriptOnce(
   videoIdRaw: string,
 ): Promise<TranscriptResponse[]> {
   const vid = parseYoutubeVideoId(videoIdRaw) ?? videoIdRaw.trim();
@@ -396,4 +420,45 @@ export async function fetchTranscriptRobust(
   }
 
   throw new YoutubeTranscriptNotAvailableError(vid);
+}
+
+/**
+ * Cached + in-flight dedupe: same `videoId` within ~45m hits memory instead of YouTube.
+ */
+export async function fetchTranscriptRobust(
+  videoIdRaw: string,
+): Promise<TranscriptResponse[]> {
+  const vid = parseYoutubeVideoId(videoIdRaw) ?? videoIdRaw.trim();
+  if (!/^[\w-]{11}$/.test(vid)) {
+    return fetchTranscriptOnce(videoIdRaw);
+  }
+
+  const now = Date.now();
+  const hit = transcriptCache.get(vid);
+  if (hit && hit.expires > now) {
+    console.warn("[video-analysis] transcript: cache hit (fewer YouTube calls)", vid);
+    return hit.rows.map((r) => ({ ...r }));
+  }
+
+  const pending = transcriptInflight.get(vid);
+  if (pending) return pending;
+
+  const p = (async () => {
+    try {
+      const rows = await fetchTranscriptOnce(videoIdRaw);
+      if (rows.length > 0) {
+        transcriptCache.set(vid, {
+          rows: rows.map((r) => ({ ...r })),
+          expires: Date.now() + TRANSCRIPT_CACHE_TTL_MS,
+        });
+        trimTranscriptCache();
+      }
+      return rows;
+    } finally {
+      transcriptInflight.delete(vid);
+    }
+  })();
+
+  transcriptInflight.set(vid, p);
+  return p;
 }

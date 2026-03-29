@@ -56,10 +56,11 @@ function segmentAnalysisBlockedReason(error: string): string {
   }
   if (
     error.includes("rate limit") ||
+    error.includes("rate-limiting") ||
     error.includes("Limiting requests") ||
     error.includes("try again later")
   ) {
-    return "YouTube is throttling requests from the server. Wait a few minutes, then tap Run analysis again.";
+    return "YouTube is throttling the server. Wait several minutes. Don’t hammer Run analysis — the same video’s captions are cached briefly after a success.";
   }
   return `${error} Check the message next to the button and use Run analysis to retry.`;
 }

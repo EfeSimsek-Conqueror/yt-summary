@@ -40,7 +40,7 @@ function mapTranscriptError(e: unknown): { status: number; message: string } {
     return {
       status: 429,
       message:
-        "YouTube is limiting requests from this server (often after many transcript fetches). Wait a few minutes and try again.",
+        "YouTube is rate-limiting this server. Wait several minutes before trying again. Avoid spamming “Run analysis”; the same video’s captions are cached for a while after a successful fetch.",
     };
   }
   if (e instanceof YoutubeTranscriptVideoUnavailableError) {
