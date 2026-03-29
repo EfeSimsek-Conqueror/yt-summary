@@ -2,7 +2,7 @@ import { DeepgramClient } from "@deepgram/sdk";
 import type { ListenV1Response } from "@deepgram/sdk";
 import { spawn } from "child_process";
 import { existsSync } from "fs";
-import { mkdtemp, readdir, readFile, rm } from "fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import type { TranscriptResponse } from "youtube-transcript";
@@ -24,6 +24,63 @@ function getYtDlpBinary(): string {
     if (existsSync(p)) return p;
   }
   return "yt-dlp";
+}
+
+/**
+ * Sunucu/datacenter IP’lerinde YouTube sık “Sign in to confirm you’re not a bot” döner.
+ * Android/tv_embedded istemcileri çoğu zaman çerez olmadan işe yarar; kalıcı çözüm: çerez.
+ */
+function youtubeCookieFileForYtDlp(dir: string): Promise<string | undefined> {
+  const pathEnv = process.env.YOUTUBE_COOKIES_PATH?.trim();
+  if (pathEnv && existsSync(pathEnv)) {
+    return Promise.resolve(pathEnv);
+  }
+  const raw = process.env.YOUTUBE_COOKIES?.trim();
+  if (raw) {
+    const p = join(dir, "cookies.txt");
+    return writeFile(p, raw, "utf8").then(() => p);
+  }
+  return Promise.resolve(undefined);
+}
+
+function defaultYoutubeExtractorFallbacks(): string[] {
+  const one = process.env.YTDLP_YOUTUBE_EXTRACTOR_ARGS?.trim();
+  if (one) return [one];
+  return [
+    "youtube:player_client=android",
+    "youtube:player_client=tv_embedded",
+  ];
+}
+
+function spawnYtDlp(
+  ytdlp: string,
+  args: string[],
+): Promise<{ stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(ytdlp, args, {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stderr = "";
+    child.stderr?.on("data", (c: Buffer) => {
+      stderr += c.toString();
+    });
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(new Error("yt-dlp timeout"));
+    }, YTDLP_TIMEOUT_MS);
+    child.on("error", (e) => {
+      clearTimeout(timer);
+      reject(e);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (code === 0) resolve({ stderr });
+      else
+        reject(
+          new Error(`yt-dlp exited ${code}: ${stderr.slice(-1200)}`),
+        );
+    });
+  });
 }
 
 function deepgramResponseToRows(res: ListenV1Response): TranscriptResponse[] {
@@ -114,35 +171,50 @@ async function downloadYoutubeAudioMp3(videoId: string): Promise<Buffer> {
   const outTemplate = join(dir, "audio.%(ext)s");
   const ytdlp = getYtDlpBinary();
   try {
-    await new Promise<void>((resolve, reject) => {
-      const child = spawn(
-        ytdlp,
-        ["-f", "bestaudio", "--no-playlist", "-o", outTemplate, url],
-        { stdio: ["ignore", "pipe", "pipe"] },
+    const cookieFile = await youtubeCookieFileForYtDlp(dir);
+    const extractors = defaultYoutubeExtractorFallbacks();
+    let lastErr: Error | undefined;
+
+    for (let i = 0; i < extractors.length; i++) {
+      const extractor = extractors[i]!;
+      const args: string[] = ["--extractor-args", extractor];
+      if (cookieFile) args.push("--cookies", cookieFile);
+      args.push(
+        "-f",
+        "bestaudio",
+        "--no-playlist",
+        "-o",
+        outTemplate,
+        url,
       );
-      let stderr = "";
-      child.stderr?.on("data", (c: Buffer) => {
-        stderr += c.toString();
-      });
-      const timer = setTimeout(() => {
-        child.kill("SIGKILL");
-        reject(new Error("yt-dlp timeout"));
-      }, YTDLP_TIMEOUT_MS);
-      child.on("error", (e) => {
-        clearTimeout(timer);
-        reject(e);
-      });
-      child.on("close", (code) => {
-        clearTimeout(timer);
-        if (code === 0) resolve();
-        else
-          reject(
-            new Error(
-              `yt-dlp exited ${code}: ${stderr.slice(-600)}`,
-            ),
+      try {
+        await spawnYtDlp(ytdlp, args);
+        if (i > 0) {
+          console.warn(
+            "[video-analysis] transcript: yt-dlp ok after fallback",
+            extractor.slice(0, 72),
           );
-      });
-    });
+        }
+        break;
+      } catch (e) {
+        lastErr = e instanceof Error ? e : new Error(String(e));
+        const msg = lastErr.message;
+        const retryable =
+          i < extractors.length - 1 &&
+          (/bot|Sign in|not a bot|unavailable/i.test(msg) ||
+            /ERROR: \[youtube\]/i.test(msg));
+        if (retryable) {
+          console.warn(
+            "[video-analysis] transcript: yt-dlp retry with next extractor",
+            videoId,
+            msg.slice(0, 200),
+          );
+          continue;
+        }
+        throw lastErr;
+      }
+    }
+
     const names = await readdir(dir);
     const audio = names.find((n) => n.startsWith("audio."));
     if (!audio) {
@@ -157,6 +229,8 @@ async function downloadYoutubeAudioMp3(videoId: string): Promise<Buffer> {
 /**
  * Download audio with yt-dlp, transcribe with Deepgram. Requires `DEEPGRAM_API_KEY`
  * and `yt-dlp` on the server (`nixpacks.toml` and/or `postinstall` script).
+ * YouTube bot duvarı için: varsayılan `player_client=android` → sonra `tv_embedded`.
+ * Kalıcı çözüm: Netscape çerezleri `YOUTUBE_COOKIES` (içerik) veya `YOUTUBE_COOKIES_PATH` (dosya).
  */
 export async function fetchTranscriptViaDeepgram(
   videoId: string,

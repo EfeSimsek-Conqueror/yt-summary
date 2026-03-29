@@ -2,4 +2,4 @@
 # yt-dlp + ffmpeg: Deepgram için ses indirme; ayrıca `npm postinstall` ikili indirir (transcript-via-deepgram.ts).
 # "..." keeps Nixpacks’ default setup packages (Node/npm toolchain); without it, npm ci can fail.
 [phases.setup]
-nixPkgs = ["...", "yt-dlp", "ffmpeg"]
+nixPkgs = ["...", "yt-dlp", "ffmpeg", "deno"]

@@ -1,5 +1,5 @@
 # Monorepo kökünden Railway deploy edildiğinde bu dosya uygulanır (`web/` altındaki nixpacks.toml atlanır).
-# yt-dlp + ffmpeg: Deepgram için ses indirme (transcript-via-deepgram.ts).
+# yt-dlp + ffmpeg + deno: Deepgram ses indirme; deno bazı YouTube EJS yolları için (yt-dlp wiki/EJS).
 # "..." Nixpacks’un varsayılan Node/npm kurulumunu korur.
 [phases.setup]
-nixPkgs = ["...", "yt-dlp", "ffmpeg"]
+nixPkgs = ["...", "yt-dlp", "ffmpeg", "deno"]
