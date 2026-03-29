@@ -1,12 +1,17 @@
 "use client";
 
 import { signInWithGoogle } from "@/lib/auth/google-oauth";
+import { ConnectYoutubeCta } from "@/components/connect-youtube-cta";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
 
 export function AuthControls() {
   const [user, setUser] = useState<User | null | "pending">("pending");
+  /** Google OAuth access token for YouTube Data API — missing on email-only sign-in. */
+  const [hasYoutubeToken, setHasYoutubeToken] = useState<boolean | "pending">(
+    "pending",
+  );
 
   useEffect(() => {
     const supabase = createClient();
@@ -15,10 +20,15 @@ export function AuthControls() {
       setUser(u ?? null);
     });
 
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setHasYoutubeToken(Boolean(session?.provider_token));
+    });
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      setHasYoutubeToken(Boolean(session?.provider_token));
     });
 
     return () => subscription.unsubscribe();
@@ -54,10 +64,13 @@ export function AuthControls() {
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center justify-end gap-2">
       <span className="hidden max-w-[160px] truncate text-xs text-gray-400 sm:inline">
         {user.email ?? user.user_metadata?.full_name ?? "Account"}
       </span>
+      {hasYoutubeToken === false ? (
+        <ConnectYoutubeCta />
+      ) : null}
       <button
         type="button"
         onClick={() => void signOut()}
