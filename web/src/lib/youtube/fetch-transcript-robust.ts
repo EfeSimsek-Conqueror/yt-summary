@@ -7,6 +7,7 @@ import {
   YoutubeTranscriptTooManyRequestError,
 } from "youtube-transcript";
 import { parseYoutubeVideoId } from "./video-id";
+import { transcriptFetchOpts } from "./youtube-transcript-fetch";
 
 const TRANSCRIPT_RATE_LIMIT_RETRIES = 3;
 const TRANSCRIPT_RATE_LIMIT_BASE_DELAY_MS = 1500;
@@ -149,7 +150,7 @@ async function fetchTranscriptWithLanguageFallbacks(
   for (const cfg of langTries) {
     try {
       const rows = await withTimeout(
-        fetchTranscript(videoIdRaw, cfg),
+        fetchTranscript(videoIdRaw, { ...transcriptFetchOpts, ...cfg }),
         FETCH_TRANSCRIPT_TIMEOUT_MS,
         id,
         false,
@@ -183,7 +184,7 @@ async function fetchTranscriptRateLimitRetries(
     await new Promise((r) => setTimeout(r, delayMs));
     try {
       return await withTimeout(
-        fetchTranscript(videoId),
+        fetchTranscript(videoId, transcriptFetchOpts),
         FETCH_TRANSCRIPT_TIMEOUT_MS,
         parseYoutubeVideoId(videoId) ?? videoId.trim(),
         false,
@@ -211,7 +212,7 @@ export async function fetchTranscriptRobust(
   const vid = parseYoutubeVideoId(videoIdRaw) ?? videoIdRaw.trim();
   const parallel = await Promise.allSettled([
     withTimeout(
-      fetchTranscript(videoIdRaw),
+      fetchTranscript(videoIdRaw, transcriptFetchOpts),
       FETCH_TRANSCRIPT_TIMEOUT_MS,
       vid,
       false,
