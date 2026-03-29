@@ -22,6 +22,10 @@ const INNERTUBE_CAPTION_TIMEOUT_MS = 40_000;
 
 let innertubePromise: Promise<Innertube> | null = null;
 
+function errBrief(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
 function getInnertube(): Promise<Innertube> {
   if (!innertubePromise) {
     innertubePromise = Innertube.create();
@@ -111,16 +115,55 @@ function parseTimedtextXml(xml: string, lang: string): TranscriptResponse[] {
   return out;
 }
 
-function ensureSrv3Fmt(baseUrl: string): string {
+function captionUrlWithFmt(baseUrl: string, fmt: "srv3" | "json3"): string {
   try {
     const u = new URL(baseUrl);
-    if (!u.searchParams.has("fmt")) u.searchParams.set("fmt", "srv3");
+    u.searchParams.set("fmt", fmt);
     return u.toString();
   } catch {
+    const join = baseUrl.includes("?") ? "&" : "?";
     return baseUrl.includes("fmt=")
-      ? baseUrl
-      : `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}fmt=srv3`;
+      ? baseUrl.replace(/fmt=[^&]*/, `fmt=${fmt}`)
+      : `${baseUrl}${join}fmt=${fmt}`;
   }
+}
+
+/** YouTube timedtext JSON (`fmt=json3`): `events[].tStartMs` / `dDurationMs` + `segs[].utf8`. */
+function parseTimedtextJson3(raw: string, lang: string): TranscriptResponse[] {
+  let parsed: { events?: unknown[] };
+  try {
+    parsed = JSON.parse(raw) as { events?: unknown[] };
+  } catch {
+    return [];
+  }
+  const events = parsed.events;
+  if (!Array.isArray(events)) return [];
+  const out: TranscriptResponse[] = [];
+  for (const ev of events) {
+    if (!ev || typeof ev !== "object") continue;
+    const o = ev as Record<string, unknown>;
+    const tStartMs = typeof o.tStartMs === "number" ? o.tStartMs : 0;
+    const dDurationMs = typeof o.dDurationMs === "number" ? o.dDurationMs : 0;
+    const segs = o.segs;
+    if (!Array.isArray(segs)) continue;
+    let text = "";
+    for (const s of segs) {
+      if (s && typeof s === "object" && "utf8" in s) {
+        const u = (s as { utf8?: unknown }).utf8;
+        if (typeof u === "string") text += u;
+      }
+    }
+    text = text.replace(/\u200b/g, "").trim();
+    if (!text) continue;
+    const durSec = dDurationMs > 0 ? dDurationMs / 1000 : 0.05;
+    out.push({
+      text,
+      offset: tStartMs / 1000,
+      duration: durSec,
+      lang,
+    });
+  }
+  return out;
 }
 
 type InnertubeCaptionTrack = {
@@ -167,15 +210,25 @@ async function fetchTranscriptViaYoutubei(
   for (const track of ordered.slice(0, 8)) {
     const baseUrl = track.base_url;
     if (!baseUrl) continue;
-    const url = ensureSrv3Fmt(baseUrl);
-    const res = await youtubeLikeFetch(url, {
-      headers: { Accept: "*/*" },
-    });
-    if (!res.ok) continue;
-    const xml = await res.text();
     const lang = track.language_code ?? "en";
-    const rows = parseTimedtextXml(xml, lang);
-    if (rows.length > 0) return rows;
+    const tries = [
+      { fmt: "srv3" as const, kind: "xml" as const },
+      { fmt: "json3" as const, kind: "json" as const },
+    ];
+    for (const { fmt, kind } of tries) {
+      const url = captionUrlWithFmt(baseUrl, fmt);
+      const res = await youtubeLikeFetch(url, {
+        headers: { Accept: "*/*" },
+      });
+      if (!res.ok) continue;
+      const body = await res.text();
+      if (!body || body.length < 2) continue;
+      const rows =
+        kind === "xml"
+          ? parseTimedtextXml(body, lang)
+          : parseTimedtextJson3(body, lang);
+      if (rows.length > 0) return rows;
+    }
   }
 
   throw new YoutubeTranscriptNotAvailableError(id);
@@ -192,10 +245,17 @@ async function fetchTranscriptWithLanguageFallbacks(
   const langTries: Array<{ lang: string }> = [
     { lang: "en" },
     { lang: "en-US" },
+    { lang: "en-GB" },
     { lang: "tr" },
     { lang: "de" },
     { lang: "fr" },
     { lang: "es" },
+    { lang: "it" },
+    { lang: "pt" },
+    { lang: "pt-BR" },
+    { lang: "ja" },
+    { lang: "ko" },
+    { lang: "hi" },
   ];
   let lastErr: unknown;
   for (const cfg of langTries) {
@@ -291,7 +351,7 @@ export async function fetchTranscriptRobust(
   if (fromY && fromY.length > 0) {
     const vid = parseYoutubeVideoId(videoIdRaw) ?? videoIdRaw;
     console.warn(
-      "[video-analysis] transcript recovered via youtubei.js fallback",
+      "[video-analysis] transcript: using innertube caption URLs (youtube-transcript empty/failed)",
       vid,
     );
     return fromY;
@@ -308,9 +368,12 @@ export async function fetchTranscriptRobust(
         return await fetchTranscriptRateLimitRetries(videoIdRaw);
       } catch (retryErr) {
         console.warn(
-          "[video-analysis] youtubei.js transcript fallback failed",
+          "[video-analysis] transcript: rate-limit retry failed",
           parseYoutubeVideoId(videoIdRaw) ?? videoIdRaw,
-          errY,
+          {
+            youtubeTranscript: errBrief(errT),
+            innertubeCaptions: errBrief(errY),
+          },
         );
         throw retryErr;
       }
@@ -322,9 +385,12 @@ export async function fetchTranscriptRobust(
       return await fetchTranscriptRateLimitRetries(videoIdRaw);
     } catch (retryErr) {
       console.warn(
-        "[video-analysis] youtubei.js transcript fallback failed",
+        "[video-analysis] transcript: rate-limit retry failed",
         parseYoutubeVideoId(videoIdRaw) ?? videoIdRaw,
-        errY,
+        {
+          youtubeTranscript: errBrief(errT),
+          innertubeCaptions: errBrief(errY),
+        },
       );
       throw retryErr;
     }
@@ -332,9 +398,9 @@ export async function fetchTranscriptRobust(
 
   if (errT instanceof YoutubeTranscriptError) {
     console.warn(
-      "[video-analysis] youtubei.js transcript fallback failed",
+      "[video-analysis] transcript: youtube-transcript failed (innertube state below)",
       parseYoutubeVideoId(videoIdRaw) ?? videoIdRaw,
-      errY,
+      { innertubeCaptions: errBrief(errY) },
     );
     throw errT;
   }
@@ -342,12 +408,10 @@ export async function fetchTranscriptRobust(
     throw errY;
   }
   if (errT || errY) {
-    console.warn(
-      "[video-analysis] transcript fetch failed after fallbacks",
-      vid,
-      errT,
-      errY,
-    );
+    console.warn("[video-analysis] transcript: all automatic sources failed", vid, {
+      youtubeTranscript: errBrief(errT),
+      innertubeCaptions: errBrief(errY),
+    });
     throw new YoutubeTranscriptNotAvailableError(vid);
   }
   throw new YoutubeTranscriptNotAvailableError(vid);

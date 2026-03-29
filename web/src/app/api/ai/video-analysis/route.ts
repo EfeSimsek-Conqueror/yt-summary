@@ -66,8 +66,8 @@ function mapTranscriptError(e: unknown): { status: number; message: string } {
 
 /**
  * POST /api/ai/video-analysis
- * Timed captions/transcript only (no AI speech-from-video). Optional transcriptPlain if fetch fails.
- * Then summary + segments via LLM.
+ * Flow: fetch timed captions (youtube-transcript + Innertube caption URLs) → LLM analysis.
+ * Optional `transcriptPlain` only when automatic fetch returns nothing.
  */
 export async function POST(request: NextRequest) {
   try {
