@@ -46,7 +46,7 @@ function mapTranscriptError(e: unknown): { status: number; message: string } {
     return {
       status: 422,
       message:
-        "Could not load captions from YouTube (automatic fetch). The video may still show subtitles in the app — try again, another language on YouTube, or paste transcriptPlain.",
+        "Automatic caption fetch failed: YouTube often does not expose caption data to cloud servers (this is not the same as “subtitles off” in the app). Try again in a few minutes, or paste transcript text (transcriptPlain) if the client supports it.",
     };
   }
   if (e instanceof YoutubeTranscriptNotAvailableLanguageError) {

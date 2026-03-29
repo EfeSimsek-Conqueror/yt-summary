@@ -42,12 +42,14 @@ function segmentAnalysisBlockedReason(error: string): string {
   }
   if (
     error.includes("Captions are disabled") ||
-    error.includes("Could not load captions from YouTube")
+    error.includes("Could not load captions from YouTube") ||
+    error.includes("Automatic caption fetch failed") ||
+    error.includes("YouTube often does not expose caption data")
   ) {
-    return "YouTube did not return captions to our server (they may still appear in the player). Try again, open captions on the video, or paste text if the app supports it.";
+    return "YouTube often omits caption data for automated server requests (the in-app player can still show subtitles). Wait and try again, or paste transcript text if the app supports it.";
   }
   if (error.includes("No captions available")) {
-    return "No YouTube captions were found; we tried AI transcription from the video. If it still failed, see the error above.";
+    return "No usable caption text was returned for this video. Try another video or paste transcript text if available.";
   }
   if (error.includes("Transcript is empty")) {
     return "The transcript came back empty. Try Run analysis again, or pick a different video.";

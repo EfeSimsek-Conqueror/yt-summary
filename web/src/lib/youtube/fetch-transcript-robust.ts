@@ -17,10 +17,19 @@ const TRANSCRIPT_RATE_LIMIT_BASE_DELAY_MS = 1500;
 
 /** `youtube-transcript` is usually fast; cap so we never block the whole request forever. */
 const FETCH_TRANSCRIPT_TIMEOUT_MS = 22_000;
-/** Innertube getInfo + caption XML fetch (no `/get_transcript` — avoids 400 FAILED_PRECONDITION). */
-const INNERTUBE_CAPTION_TIMEOUT_MS = 40_000;
+/** Innertube: multiple `getInfo` clients + caption fetches (no `/get_transcript`). */
+const INNERTUBE_CAPTION_TIMEOUT_MS = 120_000;
 
 let innertubePromise: Promise<Innertube> | null = null;
+
+/** YouTube often returns `caption_tracks` for one client but not another (esp. server/datacenter IPs). */
+const INNERTUBE_CAPTION_CLIENTS = [
+  "WEB",
+  "WEB_EMBEDDED",
+  "MWEB",
+  "ANDROID",
+  "IOS",
+] as const;
 
 function errBrief(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -28,7 +37,11 @@ function errBrief(e: unknown): string {
 
 function getInnertube(): Promise<Innertube> {
   if (!innertubePromise) {
-    innertubePromise = Innertube.create();
+    innertubePromise = Innertube.create({
+      fetch: youtubeLikeFetch,
+      lang: "en",
+      location: "US",
+    });
   }
   return innertubePromise;
 }
@@ -171,29 +184,9 @@ type InnertubeCaptionTrack = {
   language_code?: string;
 };
 
-/**
- * Uses player `captionTracks[].baseUrl` from InnerTube — does NOT call `/youtubei/v1/get_transcript`
- * (that endpoint often returns 400 FAILED_PRECONDITION for server/bot clients).
- */
-async function fetchTranscriptViaYoutubei(
-  videoIdRaw: string,
+async function fetchRowsFromInnertubeTracks(
+  tracks: InnertubeCaptionTrack[],
 ): Promise<TranscriptResponse[]> {
-  const id = parseYoutubeVideoId(videoIdRaw) ?? videoIdRaw.trim();
-  if (!/^[\w-]{11}$/.test(id)) {
-    throw new YoutubeTranscriptNotAvailableError(id);
-  }
-
-  const yt = await getInnertube();
-  const info = await yt.getInfo(id);
-  const caps = info.captions as
-    | { caption_tracks?: InnertubeCaptionTrack[] }
-    | null
-    | undefined;
-  const tracks = caps?.caption_tracks;
-  if (!tracks?.length) {
-    throw new YoutubeTranscriptNotAvailableError(id);
-  }
-
   const ordered: InnertubeCaptionTrack[] = [];
   const seen = new Set<string>();
   const push = (t: InnertubeCaptionTrack | undefined) => {
@@ -228,6 +221,47 @@ async function fetchTranscriptViaYoutubei(
           ? parseTimedtextXml(body, lang)
           : parseTimedtextJson3(body, lang);
       if (rows.length > 0) return rows;
+    }
+  }
+  return [];
+}
+
+/**
+ * Uses player caption tracks from InnerTube — does NOT call `/youtubei/v1/get_transcript`.
+ * Tries several InnerTube clients; caption lists differ per client (especially from cloud IPs).
+ */
+async function fetchTranscriptViaYoutubei(
+  videoIdRaw: string,
+): Promise<TranscriptResponse[]> {
+  const id = parseYoutubeVideoId(videoIdRaw) ?? videoIdRaw.trim();
+  if (!/^[\w-]{11}$/.test(id)) {
+    throw new YoutubeTranscriptNotAvailableError(id);
+  }
+
+  const yt = await getInnertube();
+
+  for (const client of INNERTUBE_CAPTION_CLIENTS) {
+    let info;
+    try {
+      info = await yt.getInfo(id, { client });
+    } catch {
+      continue;
+    }
+    const caps = info.captions as
+      | { caption_tracks?: InnertubeCaptionTrack[] }
+      | null
+      | undefined;
+    const tracks = caps?.caption_tracks;
+    if (!tracks?.length) continue;
+
+    const rows = await fetchRowsFromInnertubeTracks(tracks);
+    if (rows.length > 0) {
+      console.warn(
+        "[video-analysis] transcript: innertube caption URLs ok",
+        id,
+        `client=${client}`,
+      );
+      return rows;
     }
   }
 
