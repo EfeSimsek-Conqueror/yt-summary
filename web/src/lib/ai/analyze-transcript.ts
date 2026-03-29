@@ -191,14 +191,84 @@ When a "Visual analysis" section is included below:
 const MAX_TRANSCRIPT_CHARS = 100_000;
 const MAX_VISUAL_CONTEXT_CHARS = 60_000;
 
+/** First `{` … matching `}` outside of JSON strings (avoids cutting inside summary text). */
+function extractBalancedJsonObject(text: string): string | null {
+  const start = text.indexOf("{");
+  if (start < 0) return null;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i]!;
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (c === "\\" && inString) {
+      escape = true;
+      continue;
+    }
+    if (c === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (c === "{") depth++;
+    else if (c === "}") {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
 function extractJsonObject(text: string): string {
   const t = text.trim();
-  const fence = /^```(?:json)?\s*([\s\S]*?)```$/m.exec(t);
-  if (fence) return fence[1].trim();
+  const fenceAnywhere = t.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenceAnywhere) {
+    const inner = fenceAnywhere[1]?.trim() ?? "";
+    if (inner.startsWith("{")) return inner;
+  }
+  const balanced = extractBalancedJsonObject(t);
+  if (balanced) return balanced;
   const start = t.indexOf("{");
   const end = t.lastIndexOf("}");
   if (start >= 0 && end > start) return t.slice(start, end + 1);
   return t;
+}
+
+/** Common model mistakes: trailing commas before } or ]. */
+function tryParseJsonLenient(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const stripped = raw.replace(/,(\s*[}\]])/g, "$1");
+    return JSON.parse(stripped);
+  }
+}
+
+/** Normalize OpenAI SDK / Fal proxy errors into a short message for API responses. */
+function formatProviderError(e: unknown): Error {
+  if (e && typeof e === "object") {
+    const o = e as {
+      status?: number;
+      message?: string;
+      body?: { detail?: unknown };
+    };
+    const detail = o.body?.detail;
+    const detailStr =
+      detail !== undefined
+        ? typeof detail === "string"
+          ? detail
+          : JSON.stringify(detail)
+        : undefined;
+    if (o.status != null) {
+      return new Error(
+        `Analysis provider error (${o.status}): ${detailStr ?? o.message ?? "unknown"}`,
+      );
+    }
+  }
+  return e instanceof Error ? e : new Error(String(e));
 }
 
 /**
@@ -235,24 +305,42 @@ export async function analyzeTranscriptWithGeminiFlash(input: {
 
   const client = getFalOpenAI();
 
-  const response = await client.responses.create({
-    model: GEMINI_FLASH,
-    instructions: `${INSTRUCTIONS}${hasDuration ? DURATION_SEGMENT_RULES : ""}${visual ? VISUAL_MERGE_RULES : ""}`,
-    input: body,
-    temperature: 0.35,
-    max_output_tokens: 8192,
-  });
+  let response: Awaited<ReturnType<typeof client.responses.create>>;
+  try {
+    response = await client.responses.create({
+      model: GEMINI_FLASH,
+      instructions: `${INSTRUCTIONS}${hasDuration ? DURATION_SEGMENT_RULES : ""}${visual ? VISUAL_MERGE_RULES : ""}`,
+      input: body,
+      temperature: 0.35,
+      max_output_tokens: 16_384,
+    });
+  } catch (e) {
+    console.error("[analyze-transcript] Fal/OpenRouter responses.create failed", e);
+    throw formatProviderError(e);
+  }
 
   const raw = response.output_text?.trim() ?? "";
   if (!raw) {
     throw new Error("Empty model response");
   }
 
+  const jsonText = extractJsonObject(raw);
   let parsed: unknown;
   try {
-    parsed = JSON.parse(extractJsonObject(raw));
-  } catch {
-    throw new Error("Model did not return valid JSON");
+    parsed = tryParseJsonLenient(jsonText);
+  } catch (e) {
+    const hint = raw.length > 12_000 ? " (response may be truncated)" : "";
+    console.error(
+      "[analyze-transcript] JSON parse failed",
+      hint,
+      "snippet:",
+      raw.slice(0, 400),
+    );
+    throw new Error(
+      e instanceof Error
+        ? `Model did not return valid JSON: ${e.message}`
+        : "Model did not return valid JSON",
+    );
   }
 
   const result = analysisSchema.safeParse(parsed);

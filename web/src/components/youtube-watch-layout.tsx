@@ -3,7 +3,7 @@
 /// <reference types="youtube" />
 
 import Image from "next/image";
-import { ThumbsUp } from "lucide-react";
+import { RotateCw, ThumbsUp } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { YoutubeIframePlayer } from "@/components/youtube-iframe-player";
 import { YoutubeSummaryTakeawaysPanel } from "@/components/youtube-summary-takeaways-panel";
@@ -186,6 +186,13 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
   /** Fullscreen: left 25% segments, right 75% player (summary stays on page). */
   const watchStageRef = useRef<HTMLDivElement>(null);
   const [watchFullscreen, setWatchFullscreen] = useState(false);
+  /** Dismisses stale `analysisBusy` when a newer run supersedes or aborts an older one. */
+  const analysisRunGenRef = useRef(0);
+  /** In-flight POST /api/ai/video-analysis — aborted on segment reload or video change. */
+  const analysisAbortRef = useRef<AbortController | null>(null);
+  /** Start time for estimated progress (API does not stream real %). */
+  const analysisProgressStartedRef = useRef<number>(0);
+  const [analysisProgressPct, setAnalysisProgressPct] = useState(0);
 
   const canEmbed = isLikelyYoutubeVideoId(video.id);
 
@@ -227,6 +234,7 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
   }, []);
 
   useEffect(() => {
+    analysisRunGenRef.current = 0;
     setAnalysis(null);
     setAnalysisError(null);
     setAnalysisBusy(false);
@@ -242,13 +250,21 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
     }
   }, [video.id]);
 
-  const segments = analysis?.segments ?? video.segments;
+  /** Prefer AI analysis segments; while analysis is running, ignore mock `video.segments` so the loading bar shows. */
+  const analysisSegments = analysis?.segments;
+  const hasAnalysisSegments =
+    Array.isArray(analysisSegments) && analysisSegments.length > 0;
+  const segments = hasAnalysisSegments
+    ? analysisSegments
+    : analysisBusy
+      ? []
+      : video.segments;
   const summaryShort = analysis?.summaryShort ?? video.summaryShort;
 
   const preAnalysisHint = canEmbed
     ? analysisBusy
       ? "Generating summary and segments…"
-      : "Analysis uses YouTube captions when available; otherwise it transcribes speech with AI. If speech is thin for the video length, on-screen visual analysis is added automatically (films, games, scenes), then recap and segments—not the raw transcript."
+      : "The server loads timed captions when possible, then runs analysis. The text shown here before you run analysis is the video description, not subtitles."
     : video.transcriptPreview;
 
   const summaryPanelScrollable = !canEmbed || Boolean(analysis);
@@ -281,8 +297,31 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
     }
   }, []);
 
+  /** Asymptotic 0→95% while waiting; not from the server (single request has no progress events). */
+  useEffect(() => {
+    if (!analysisBusy) {
+      setAnalysisProgressPct(0);
+      return;
+    }
+    analysisProgressStartedRef.current = Date.now();
+    setAnalysisProgressPct(0);
+    const tick = () => {
+      const elapsedSec =
+        (Date.now() - analysisProgressStartedRef.current) / 1000;
+      const pct = Math.min(
+        95,
+        Math.floor(100 * (1 - Math.exp(-elapsedSec / 22))),
+      );
+      setAnalysisProgressPct(pct);
+    };
+    tick();
+    const id = window.setInterval(tick, 250);
+    return () => clearInterval(id);
+  }, [analysisBusy]);
+
   const runVideoAnalysis = useCallback(
     async (signal?: AbortSignal) => {
+      const gen = ++analysisRunGenRef.current;
       setAnalysisBusy(true);
       setAnalysisError(null);
       try {
@@ -361,7 +400,7 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
         }
         setAnalysisError("Network error");
       } finally {
-        if (!signal?.aborted) {
+        if (gen === analysisRunGenRef.current) {
           setAnalysisBusy(false);
         }
       }
@@ -369,11 +408,21 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
     [video.id, video.title, video.durationLabel],
   );
 
+  const retrySegmentAnalysis = useCallback(() => {
+    analysisAbortRef.current?.abort();
+    const ac = new AbortController();
+    analysisAbortRef.current = ac;
+    void runVideoAnalysis(ac.signal);
+  }, [runVideoAnalysis]);
+
   useEffect(() => {
     if (!canEmbed) return;
     const ac = new AbortController();
+    analysisAbortRef.current = ac;
     void runVideoAnalysis(ac.signal);
-    return () => ac.abort();
+    return () => {
+      ac.abort();
+    };
   }, [canEmbed, video.id, runVideoAnalysis]);
 
   useEffect(() => {
@@ -494,13 +543,57 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
           </>
         )}
 
-            {segments.length === 0 ? (
+            {analysisBusy && !hasAnalysisSegments ? (
+              <div
+                className="cursor-wait space-y-2"
+                role="status"
+                aria-live="polite"
+                aria-busy="true"
+              >
+                <div className="flex items-start gap-2">
+                  <p className="min-w-0 flex-1 text-sm text-muted">
+                    Loading captions, then generating summary…
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => retrySegmentAnalysis()}
+                    className="shrink-0 cursor-pointer rounded-md border border-line bg-raised p-1.5 text-muted transition hover:bg-surface hover:text-foreground"
+                    aria-label="Retry segment analysis"
+                    title="Retry segment analysis"
+                  >
+                    <RotateCw className="h-4 w-4" aria-hidden />
+                  </button>
+                </div>
+                <div
+                  className="space-y-1"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={analysisProgressPct}
+                  aria-label="Estimated analysis progress"
+                >
+                  <div className="h-2.5 w-full overflow-hidden rounded-full border border-line bg-white/10">
+                    <div
+                      className="h-full min-h-[6px] rounded-full bg-accent shadow-[0_0_12px_rgba(59,130,246,0.35)] transition-[width] duration-300 ease-out"
+                      style={{ width: `${analysisProgressPct}%` }}
+                    />
+                  </div>
+                  <p
+                    className="text-[11px] tabular-nums leading-tight text-muted"
+                    title="Approximate progress based on elapsed time; the API does not stream real percentages."
+                  >
+                    <span className="font-medium text-foreground/90">
+                      {analysisProgressPct}%
+                    </span>
+                    <span className="opacity-75"> · estimated</span>
+                  </p>
+                </div>
+              </div>
+            ) : !hasAnalysisSegments && segments.length === 0 ? (
               <p className="text-sm text-muted">
-                {analysisBusy
-                  ? "Transcribing or reading captions, then generating summary…"
-                  : analysisError
-                    ? segmentAnalysisBlockedReason(analysisError)
-                    : "No segments yet. For real videos, run analysis (FAL_KEY required; captions if available, else AI transcription via FAL or optional GEMINI_API_KEY)."}
+                {analysisError
+                  ? segmentAnalysisBlockedReason(analysisError)
+                  : "No segments yet. Run analysis (FAL_KEY required; captions from YouTube, then summary)."}
               </p>
             ) : (
               <ul className="space-y-2">
@@ -688,23 +781,48 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
         </p>
 
         {canEmbed ? (
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              disabled={analysisBusy}
-              onClick={() => void runVideoAnalysis()}
-              className="rounded-lg border border-line bg-raised px-3 py-2 text-sm font-medium text-foreground transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {analysisBusy
-                ? "Running analysis…"
-                : analysis
-                  ? "Run analysis again"
-                  : "Run analysis"}
-            </button>
-            {analysisError ? (
-              <span className="text-sm text-red-600 dark:text-red-400">
-                {analysisError}
-              </span>
+          <div className="mb-4 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={analysisBusy}
+                onClick={() => void runVideoAnalysis()}
+                className="rounded-lg border border-line bg-raised px-3 py-2 text-sm font-medium text-foreground transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {analysisBusy
+                  ? "Running analysis…"
+                  : analysis
+                    ? "Run analysis again"
+                    : "Run analysis"}
+              </button>
+              {analysisError ? (
+                <span className="text-sm text-red-600 dark:text-red-400">
+                  {analysisError}
+                </span>
+              ) : null}
+            </div>
+            {analysisBusy && !hasAnalysisSegments ? (
+              <div
+                className="max-w-md space-y-1"
+                role="progressbar"
+                aria-valuenow={analysisProgressPct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="Estimated analysis progress"
+              >
+                <div className="h-2.5 w-full overflow-hidden rounded-full border border-line bg-white/10">
+                  <div
+                    className="h-full min-h-[6px] rounded-full bg-accent shadow-[0_0_12px_rgba(59,130,246,0.35)] transition-[width] duration-300 ease-out"
+                    style={{ width: `${analysisProgressPct}%` }}
+                  />
+                </div>
+                <p className="text-[11px] tabular-nums text-muted">
+                  <span className="font-medium text-foreground/90">
+                    {analysisProgressPct}%
+                  </span>
+                  <span className="opacity-75"> · estimated</span>
+                </p>
+              </div>
             ) : null}
           </div>
         ) : null}

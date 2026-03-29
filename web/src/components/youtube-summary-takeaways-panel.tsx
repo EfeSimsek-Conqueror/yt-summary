@@ -41,7 +41,7 @@ export function YoutubeSummaryTakeawaysPanel({
         id="vidsum-summary-heading"
         className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-muted"
       >
-        {canEmbed ? "Summary & takeaways" : "Transcript preview"}
+        {canEmbed ? "Summary & takeaways" : "Description preview"}
       </h2>
       <div
         suppressHydrationWarning
