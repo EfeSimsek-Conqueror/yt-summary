@@ -25,12 +25,12 @@ function buildQuickPrompts(analysis: AnalysisPayload): string[] {
     if (hypeMoments.length > 1) {
       prompts.push("Go to the strongest hype peak");
     }
-    prompts.push("En iyi hype anına git");
+    prompts.push("Go to the best hype moment");
   }
 
   if (segments.length >= 2) {
     prompts.push("Go to segment 2");
-    prompts.push("İkinci bölüme git");
+    prompts.push("Go to the second section");
   } else if (segments.length === 1) {
     prompts.push("Jump to this section");
   }
@@ -42,12 +42,12 @@ function buildQuickPrompts(analysis: AnalysisPayload): string[] {
   }
 
   if (contentKind === "music") {
-    prompts.push("Şarkının en yoğun yerine git");
+    prompts.push("Go to the most intense part of the song");
     prompts.push("Take me to the chorus / drop");
   }
   if (contentKind === "tutorial") {
     prompts.push("Jump to the main how-to part");
-    prompts.push("Anlatımın özüne git");
+    prompts.push("Jump to the core of the walkthrough");
   }
   if (contentKind === "podcast" || contentKind === "news") {
     prompts.push("Skip to the main story");
@@ -60,7 +60,7 @@ function buildQuickPrompts(analysis: AnalysisPayload): string[] {
     .join(" ")
     .toLowerCase();
   if (/\b(goal|gol|scor|match|maç|futbol|soccer)\b/i.test(textBlob)) {
-    prompts.push("Gol anına git");
+    prompts.push("Jump to the goal");
     prompts.push("Jump to the goal moment");
   }
 
@@ -74,7 +74,7 @@ function buildQuickPrompts(analysis: AnalysisPayload): string[] {
   if (uniq.length < 3) {
     uniq.push(
       "What is this video mainly about?",
-      "Özeti bir cümlede söyle",
+      "Summarize it in one sentence",
     );
   }
 
@@ -194,8 +194,8 @@ export function VideoAssistantChat({
               Video AI chat
             </h3>
             <p className="mt-0.5 text-[11px] leading-snug text-muted">
-              This video only — ask in Turkish or English. Say where to go (hype
-              moment, goal, segment, chorus…) and the player can{" "}
+              This video only — ask in English. Say where to go (hype moment,
+              goal, segment, chorus…) and the player can{" "}
               <span className="text-foreground/90">seek</span> when the
               interactive player is on.
             </p>
@@ -278,7 +278,7 @@ export function VideoAssistantChat({
             placeholder={
               busy
                 ? "Waiting…"
-                : "e.g. Gol anına git · Jump to the drop · 3. segmente git"
+                : "e.g. Jump to the goal · Jump to the drop · Go to segment 3"
             }
             className="min-w-0 flex-1 rounded-lg border border-line bg-canvas px-3 py-2.5 text-sm text-foreground placeholder:text-muted/55 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:opacity-60"
             autoComplete="off"

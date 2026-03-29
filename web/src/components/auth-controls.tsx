@@ -2,6 +2,7 @@
 
 import { signInWithGoogle } from "@/lib/auth/google-oauth";
 import { ConnectYoutubeCta } from "@/components/connect-youtube-cta";
+import { UserProfileMenu } from "@/components/user-profile-menu";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
@@ -65,19 +66,8 @@ export function AuthControls() {
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
-      <span className="hidden max-w-[160px] truncate text-xs text-gray-400 sm:inline">
-        {user.email ?? user.user_metadata?.full_name ?? "Account"}
-      </span>
-      {hasYoutubeToken === false ? (
-        <ConnectYoutubeCta />
-      ) : null}
-      <button
-        type="button"
-        onClick={() => void signOut()}
-        className="rounded-lg px-2 py-1 text-xs text-gray-400 transition hover:bg-zinc-900 hover:text-white"
-      >
-        Sign out
-      </button>
+      {hasYoutubeToken === false ? <ConnectYoutubeCta /> : null}
+      <UserProfileMenu user={user} onSignOut={signOut} />
     </div>
   );
 }

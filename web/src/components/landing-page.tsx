@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CREDITS_PER_5_MIN_BLOCK, PLAN_ORDER, PLANS } from "@/lib/billing/plans";
 import {
   BarChart3,
   Check,
@@ -389,83 +390,92 @@ export function LandingPage() {
             <p className="text-xl text-gray-400">Choose the plan that works for you</p>
           </div>
 
+          <p className="mx-auto mb-10 max-w-2xl text-center text-sm text-gray-500">
+            {CREDITS_PER_5_MIN_BLOCK} credits per 5 minutes of analyzed video.
+          </p>
+
           <div className="mx-auto grid max-w-5xl gap-8 md:grid-cols-3">
-            <div className="rounded-xl border border-gray-800 bg-gray-900 p-8">
-              <h3 className="mb-2 text-2xl font-bold">Free</h3>
-              <div className="mb-6">
-                <span className="text-4xl font-bold">$0</span>
-                <span className="text-gray-400">/month</span>
-              </div>
-              <ul className="mb-8 space-y-3">
-                {["5 videos per month", "Basic segmentation", "Standard support"].map(
-                  (t) => (
-                    <li key={t} className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-5 w-5 shrink-0 text-blue-400" />
-                      <span className="text-gray-300">{t}</span>
-                    </li>
-                  ),
-                )}
-              </ul>
-              <Link
-                href="/dashboard"
-                className="block w-full rounded-lg border border-gray-700 py-2.5 text-center font-medium transition hover:bg-gray-800"
-              >
-                Get Started
-              </Link>
-            </div>
+            {PLAN_ORDER.map((planId) => {
+              const plan = PLANS[planId];
+              const isPopular = plan.popular;
+              const features =
+                planId === "scout"
+                  ? [
+                      `${plan.creditsIncluded} credits to get started (one-time)`,
+                      "Basic segmentation",
+                      "Standard support",
+                    ]
+                  : planId === "navigator"
+                    ? [
+                        `${plan.creditsIncluded} credits per month`,
+                        "Advanced AI analysis & sentiment",
+                        "Priority support",
+                      ]
+                    : [
+                        `${plan.creditsIncluded} credits per month`,
+                        "Everything in Navigator",
+                        "API access & dedicated support",
+                      ];
 
-            <div className="relative rounded-xl border border-blue-500 bg-gradient-to-b from-blue-600 to-blue-700 p-8">
-              <div className="absolute right-0 top-0 rounded-bl-lg rounded-tr-lg bg-yellow-400 px-3 py-1 text-xs font-bold text-black">
-                POPULAR
-              </div>
-              <h3 className="mb-2 text-2xl font-bold">Pro</h3>
-              <div className="mb-6">
-                <span className="text-4xl font-bold">$19</span>
-                <span className="text-blue-100">/month</span>
-              </div>
-              <ul className="mb-8 space-y-3">
-                {[
-                  "100 videos per month",
-                  "Advanced AI analysis",
-                  "Sentiment detection",
-                  "Priority support",
-                ].map((t) => (
-                  <li key={t} className="flex items-start gap-2">
-                    <Check className="mt-0.5 h-5 w-5 shrink-0 text-white" />
-                    <span className="text-white">{t}</span>
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href="/dashboard"
-                className="block w-full rounded-lg bg-white py-2.5 text-center font-medium text-blue-600 transition hover:bg-gray-100"
-              >
-                Start Free Trial
-              </Link>
-            </div>
+              if (isPopular) {
+                return (
+                  <div
+                    key={plan.id}
+                    className="relative rounded-xl border border-blue-500 bg-gradient-to-b from-blue-600 to-blue-700 p-8"
+                  >
+                    <div className="absolute right-0 top-0 rounded-bl-lg rounded-tr-lg bg-yellow-400 px-3 py-1 text-xs font-bold text-black">
+                      POPULAR
+                    </div>
+                    <h3 className="mb-2 text-2xl font-bold">{plan.displayName}</h3>
+                    <div className="mb-6">
+                      <span className="text-4xl font-bold">{plan.priceLabel}</span>
+                      <span className="text-blue-100">{plan.priceSubtext}</span>
+                    </div>
+                    <ul className="mb-8 space-y-3">
+                      {features.map((t) => (
+                        <li key={t} className="flex items-start gap-2">
+                          <Check className="mt-0.5 h-5 w-5 shrink-0 text-white" />
+                          <span className="text-white">{t}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <Link
+                      href="/dashboard"
+                      className="block w-full rounded-lg bg-white py-2.5 text-center font-medium text-blue-600 transition hover:bg-gray-100"
+                    >
+                      Start Free Trial
+                    </Link>
+                  </div>
+                );
+              }
 
-            <div className="rounded-xl border border-gray-800 bg-gray-900 p-8">
-              <h3 className="mb-2 text-2xl font-bold">Enterprise</h3>
-              <div className="mb-6">
-                <span className="text-4xl font-bold">Custom</span>
-              </div>
-              <ul className="mb-8 space-y-3">
-                {[
-                  "Unlimited videos",
-                  "API access",
-                  "Custom integrations",
-                  "Dedicated support",
-                ].map((t) => (
-                  <li key={t} className="flex items-start gap-2">
-                    <Check className="mt-0.5 h-5 w-5 shrink-0 text-blue-400" />
-                    <span className="text-gray-300">{t}</span>
-                  </li>
-                ))}
-              </ul>
-              <span className="block w-full cursor-default rounded-lg border border-gray-700 py-2.5 text-center font-medium text-gray-400">
-                Contact Sales
-              </span>
-            </div>
+              return (
+                <div
+                  key={plan.id}
+                  className="rounded-xl border border-gray-800 bg-gray-900 p-8"
+                >
+                  <h3 className="mb-2 text-2xl font-bold">{plan.displayName}</h3>
+                  <div className="mb-6">
+                    <span className="text-4xl font-bold">{plan.priceLabel}</span>
+                    <span className="text-gray-400">{plan.priceSubtext}</span>
+                  </div>
+                  <ul className="mb-8 space-y-3">
+                    {features.map((t) => (
+                      <li key={t} className="flex items-start gap-2">
+                        <Check className="mt-0.5 h-5 w-5 shrink-0 text-blue-400" />
+                        <span className="text-gray-300">{t}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Link
+                    href="/dashboard"
+                    className="block w-full rounded-lg border border-gray-700 py-2.5 text-center font-medium transition hover:bg-gray-800"
+                  >
+                    {planId === "captain" ? "Upgrade" : "Get Started"}
+                  </Link>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
