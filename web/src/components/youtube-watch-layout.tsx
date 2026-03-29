@@ -28,6 +28,9 @@ const thumbGradients = [
   "from-emerald-700 to-slate-900",
 ];
 
+/** Matches POST /api/ai/video-analysis `transcriptPlain` minimum. */
+const MIN_TRANSCRIPT_PASTE_CHARS = 400;
+
 function thumbClass(id: string) {
   const i =
     id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) %
@@ -43,10 +46,11 @@ function segmentAnalysisBlockedReason(error: string): string {
   if (
     error.includes("Captions are disabled") ||
     error.includes("Could not load captions from YouTube") ||
+    error.includes("Caption fetch failed") ||
     error.includes("Automatic caption fetch failed") ||
     error.includes("YouTube often does not expose caption data")
   ) {
-    return "YouTube often omits caption data for automated server requests (the in-app player can still show subtitles). Wait and try again, or paste transcript text if the app supports it.";
+    return "YouTube often omits caption data for automated server requests (the in-app player can still show subtitles). Wait and try again, or paste at least 400 characters in “Paste transcript” below and run analysis.";
   }
   if (error.includes("No captions available")) {
     return "No usable caption text was returned for this video. Try another video or paste transcript text if available.";
@@ -202,6 +206,8 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
   const [analysisProgressPct, setAnalysisProgressPct] = useState(0);
   /** True after ~22s so we don't pretend we're stuck at one fake %. */
   const [analysisProgressSlow, setAnalysisProgressSlow] = useState(false);
+  /** Optional pasted transcript when YouTube won’t serve captions to the server (API: transcriptPlain, min 400 chars). */
+  const [transcriptPaste, setTranscriptPaste] = useState("");
 
   const canEmbed = isLikelyYoutubeVideoId(video.id);
 
@@ -254,6 +260,7 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
     setPlayhead(0);
     playerRef.current = null;
     setWatchFullscreen(false);
+    setTranscriptPaste("");
     if (typeof document !== "undefined" && document.fullscreenElement) {
       void document.exitFullscreen().catch(() => {});
     }
@@ -346,6 +353,7 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
       setAnalysisError(null);
       try {
         const durationSec = parseDurationLabelToSeconds(video.durationLabel);
+        const plain = transcriptPaste.trim();
         const res = await fetch("/api/ai/video-analysis", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -354,6 +362,9 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
             videoTitle: video.title,
             ...(durationSec != null ? { durationSec } : {}),
             durationLabel: video.durationLabel,
+            ...(plain.length >= MIN_TRANSCRIPT_PASTE_CHARS
+              ? { transcriptPlain: plain }
+              : {}),
           }),
           signal,
         });
@@ -425,7 +436,7 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
         }
       }
     },
-    [video.id, video.title, video.durationLabel],
+    [video.id, video.title, video.durationLabel, transcriptPaste],
   );
 
   const retrySegmentAnalysis = useCallback(() => {
@@ -857,6 +868,32 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
                 ) : null}
               </div>
             ) : null}
+            <div className="max-w-xl space-y-1.5">
+              <label
+                htmlFor="transcript-paste-fallback"
+                className="block text-[11px] font-medium uppercase tracking-wide text-muted"
+              >
+                Paste transcript (fallback)
+              </label>
+              <p className="text-[11px] leading-snug text-muted">
+                If automatic captions fail, paste YouTube’s transcript here
+                (open transcript on YouTube → copy). Sent only if{" "}
+                {MIN_TRANSCRIPT_PASTE_CHARS}+ characters.
+              </p>
+              <textarea
+                id="transcript-paste-fallback"
+                value={transcriptPaste}
+                onChange={(e) => setTranscriptPaste(e.target.value)}
+                rows={4}
+                disabled={analysisBusy}
+                placeholder="Paste transcript text…"
+                className="w-full resize-y rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-foreground placeholder:text-muted/70 disabled:opacity-60"
+              />
+              <p className="text-[11px] tabular-nums text-muted">
+                {transcriptPaste.trim().length} / {MIN_TRANSCRIPT_PASTE_CHARS}{" "}
+                min · included in request when over minimum
+              </p>
+            </div>
           </div>
         ) : null}
 

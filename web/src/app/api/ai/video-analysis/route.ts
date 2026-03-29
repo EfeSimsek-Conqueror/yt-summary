@@ -50,7 +50,7 @@ function mapTranscriptError(e: unknown): { status: number; message: string } {
     return {
       status: 422,
       message:
-        "Automatic caption fetch failed: YouTube often does not expose caption data to cloud servers (this is not the same as “subtitles off” in the app). Try again in a few minutes, or paste transcript text (transcriptPlain) if the client supports it.",
+        "Caption fetch failed: YouTube may not send caption data to this server (subtitles in the player can still work). Retry in a few minutes, or paste at least 400 characters of transcript as transcriptPlain.",
     };
   }
   if (e instanceof YoutubeTranscriptNotAvailableLanguageError) {
