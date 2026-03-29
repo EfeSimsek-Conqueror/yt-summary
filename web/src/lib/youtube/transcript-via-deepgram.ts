@@ -33,10 +33,66 @@ function deepgramResponseToRows(res: ListenV1Response): TranscriptResponse[] {
     if (rows.length > 0) return rows;
   }
 
-  const tr =
-    res.results?.channels?.[0]?.alternatives?.[0]?.transcript?.trim() ?? "";
-  if (tr.length === 0) return [];
-  return [{ text: tr, offset: 0, duration: 1, lang: "en" }];
+  const alt = res.results?.channels?.[0]?.alternatives?.[0];
+  if (!alt) return [];
+
+  const tr = alt.transcript?.trim() ?? "";
+  if (tr.length > 0) {
+    return [{ text: tr, offset: 0, duration: 1, lang: "en" }];
+  }
+
+  const paraTr = alt.paragraphs?.transcript?.trim();
+  if (paraTr) {
+    return [{ text: paraTr, offset: 0, duration: 1, lang: "en" }];
+  }
+
+  const pItems = alt.paragraphs?.paragraphs;
+  if (Array.isArray(pItems)) {
+    const rows: TranscriptResponse[] = [];
+    for (const p of pItems) {
+      const sentences = p?.sentences;
+      if (!Array.isArray(sentences)) continue;
+      for (const s of sentences) {
+        const text =
+          typeof s?.text === "string" ? s.text.trim() : "";
+        if (!text) continue;
+        const start = typeof s.start === "number" ? s.start : 0;
+        const end = typeof s.end === "number" ? s.end : start;
+        rows.push({
+          text,
+          offset: start,
+          duration: Math.max(0.05, end - start),
+          lang: "en",
+        });
+      }
+    }
+    if (rows.length > 0) return rows;
+  }
+
+  const words = alt.words;
+  if (Array.isArray(words) && words.length > 0) {
+    const stitched = words
+      .map((w) => (typeof w.word === "string" ? w.word : ""))
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    if (stitched.length > 0) {
+      const t0 = typeof words[0]?.start === "number" ? words[0]!.start! : 0;
+      const last = words[words.length - 1];
+      const t1 =
+        typeof last?.end === "number" ? last.end : t0;
+      return [
+        {
+          text: stitched,
+          offset: t0,
+          duration: Math.max(0.05, t1 - t0),
+          lang: "en",
+        },
+      ];
+    }
+  }
+
+  return [];
 }
 
 async function downloadYoutubeAudioMp3(videoId: string): Promise<Buffer> {
@@ -99,8 +155,27 @@ export async function fetchTranscriptViaDeepgram(
   const apiKey = getDeepgramApiKey();
   if (!apiKey) return [];
 
-  const buffer = await downloadYoutubeAudioMp3(videoId);
-  if (buffer.length < 64) return [];
+  let buffer: Buffer;
+  try {
+    buffer = await downloadYoutubeAudioMp3(videoId);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(
+      "[video-analysis] transcript: deepgram yt-dlp/audio download failed",
+      videoId,
+      msg,
+    );
+    throw e;
+  }
+
+  if (buffer.length < 64) {
+    console.warn(
+      "[video-analysis] transcript: deepgram audio file too small",
+      videoId,
+      buffer.length,
+    );
+    return [];
+  }
 
   const model =
     process.env.DEEPGRAM_MODEL?.trim() || "nova-2";
@@ -109,18 +184,40 @@ export async function fetchTranscriptViaDeepgram(
 
   const client = new DeepgramClient({ apiKey });
 
-  const response = await client.listen.v1.media.transcribeFile(
-    buffer,
-    {
-      model,
-      language,
-      smart_format: true,
-      utterances: true,
-      punctuate: true,
-    },
-    { timeoutInSeconds: DEEPGRAM_TIMEOUT_SEC },
-  );
+  let res: ListenV1Response;
+  try {
+    const response = await client.listen.v1.media.transcribeFile(
+      buffer,
+      {
+        model,
+        language,
+        smart_format: true,
+        utterances: true,
+        punctuate: true,
+      },
+      { timeoutInSeconds: DEEPGRAM_TIMEOUT_SEC },
+    );
+    res = (await response) as ListenV1Response;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(
+      "[video-analysis] transcript: deepgram API request failed",
+      videoId,
+      msg,
+    );
+    throw e;
+  }
 
-  const res = (await response) as ListenV1Response;
-  return deepgramResponseToRows(res);
+  const rows = deepgramResponseToRows(res);
+  if (rows.length === 0) {
+    const ch = res.results?.channels?.length ?? 0;
+    const meta = res.metadata as { duration?: number } | undefined;
+    console.warn(
+      "[video-analysis] transcript: deepgram returned empty parse",
+      videoId,
+      `channels=${ch}`,
+      `duration=${meta?.duration ?? "?"}`,
+    );
+  }
+  return rows;
 }

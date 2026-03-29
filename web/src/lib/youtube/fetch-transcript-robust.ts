@@ -349,8 +349,17 @@ async function fetchTranscriptOnce(
         console.warn("[video-analysis] transcript: deepgram ok (primary)", vid);
         return fromDg;
       }
-    } catch {
-      /* yt-dlp missing, Deepgram error, or timeout — fall back to YouTube captions */
+      console.warn(
+        "[video-analysis] transcript: deepgram produced no rows; trying YouTube captions",
+        vid,
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(
+        "[video-analysis] transcript: deepgram path failed; trying YouTube captions",
+        vid,
+        msg,
+      );
     }
   }
 
@@ -398,6 +407,13 @@ async function fetchTranscriptOnce(
 
   if (youtubeRateLimited && !getDeepgramApiKey()) {
     throw new YoutubeTranscriptTooManyRequestError();
+  }
+
+  if (!getDeepgramApiKey()) {
+    console.warn(
+      "[video-analysis] transcript: all caption paths failed; set DEEPGRAM_API_KEY (+ yt-dlp/ffmpeg on server) for audio transcription fallback",
+      vid,
+    );
   }
 
   throw new YoutubeTranscriptNotAvailableError(vid);
