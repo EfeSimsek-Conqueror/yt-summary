@@ -13,10 +13,27 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+/** Production: https://vidsum.ai — override with NEXT_PUBLIC_APP_URL in preview/staging. */
+const siteUrl =
+  process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") ||
+  "https://vidsum.ai";
+
 export const metadata: Metadata = {
-  title: "VidSum",
+  metadataBase: new URL(`${siteUrl}/`),
+  title: {
+    default: "VidSum",
+    template: "%s · VidSum",
+  },
   description:
     "VidSum — AI summaries, segments, and takeaways for your YouTube subscriptions and search.",
+  openGraph: {
+    type: "website",
+    siteName: "VidSum",
+    url: siteUrl,
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
 };
 
 export default function RootLayout({

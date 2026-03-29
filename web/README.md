@@ -2,6 +2,8 @@
 
 Next.js app for YouTube subscriptions, search, and AI-powered summaries.
 
+**Production:** [vidsum.ai](https://vidsum.ai) — set `NEXT_PUBLIC_APP_URL=https://vidsum.ai` and Supabase redirect URLs for that domain.
+
 Bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
