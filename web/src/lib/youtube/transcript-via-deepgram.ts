@@ -15,7 +15,6 @@ export function getDeepgramApiKey(): string | undefined {
 const YTDLP_TIMEOUT_MS = 8 * 60 * 1000;
 const DEEPGRAM_TIMEOUT_SEC = 600;
 
-/** PATH, `YTDLP_PATH`, veya `postinstall` ile indirilen `node_modules/.bin/yt-dlp`. */
 function getYtDlpBinary(): string {
   const fromEnv = process.env.YTDLP_PATH?.trim();
   if (fromEnv) return fromEnv;
@@ -26,10 +25,6 @@ function getYtDlpBinary(): string {
   return "yt-dlp";
 }
 
-/**
- * Sunucu/datacenter IP'lerinde YouTube sık "Sign in to confirm you're not a bot" döner.
- * Kalici cozum: cerez. YOUTUBE_COOKIES veya YOUTUBE_COOKIES_PATH env ile saglanir.
- */
 function youtubeCookieFileForYtDlp(dir: string): Promise<string | undefined> {
   const pathEnv = process.env.YOUTUBE_COOKIES_PATH?.trim();
   if (pathEnv && existsSync(pathEnv)) {
@@ -44,11 +39,19 @@ function youtubeCookieFileForYtDlp(dir: string): Promise<string | undefined> {
 }
 
 /**
- * Extractor fallback listesi.
- * tv_embedded artik desteklenmiyor (Skipping unsupported client).
- * mweb ve android_vr genellikle bot kontrolunden geciyor.
- * YTDLP_YOUTUBE_EXTRACTOR_ARGS env ile override edilebilir.
+ * YOUTUBE_OAUTH2=true ise yt-dlp'ye --username oauth2 --password "" gecilir.
+ * Bunun icin once /api/youtube/oauth-init POST ile device flow baslatilmali,
+ * kullanici google.com/device URL'sinde onaylamali.
+ * Token ~/.cache/yt-dlp/ altina kaydedilir ve yeniden kullanilir.
  */
+function youtubeOAuth2Args(): string[] {
+  const enabled = process.env.YOUTUBE_OAUTH2?.trim();
+  if (enabled === "true" || enabled === "1") {
+    return ["--username", "oauth2", "--password", ""];
+  }
+  return [];
+}
+
 function defaultYoutubeExtractorFallbacks(): string[] {
   const one = process.env.YTDLP_YOUTUBE_EXTRACTOR_ARGS?.trim();
   if (one) return [one];
@@ -166,18 +169,22 @@ function deepgramResponseToRows(res: ListenV1Response): TranscriptResponse[] {
 async function downloadYoutubeAudioMp3(videoId: string): Promise<Buffer> {
   const url = `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
   const dir = await mkdtemp(join(tmpdir(), "vidsum-yt-"));
-  /** `bestaudio` dogrudan indirir; Deepgram m4a/webm kabul eder. */
   const outTemplate = join(dir, "audio.%(ext)s");
   const ytdlp = getYtDlpBinary();
   try {
     const cookieFile = await youtubeCookieFileForYtDlp(dir);
+    const oauthArgs = youtubeOAuth2Args();
     const extractors = defaultYoutubeExtractorFallbacks();
     let lastErr: Error | undefined;
     for (let i = 0; i < extractors.length; i++) {
       const extractor = extractors[i]!;
       const args: string[] = ["--extractor-args", extractor];
-      if (cookieFile) args.push("--cookies", cookieFile);
-      // Bot tespitini azaltmak icin gercek tarayici UA
+      // OAuth2 takes priority over cookies; don't use both
+      if (oauthArgs.length > 0) {
+        args.push(...oauthArgs);
+      } else if (cookieFile) {
+        args.push("--cookies", cookieFile);
+      }
       args.push(
         "--add-header",
         "User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -229,12 +236,6 @@ async function downloadYoutubeAudioMp3(videoId: string): Promise<Buffer> {
   }
 }
 
-/**
- * Download audio with yt-dlp, transcribe with Deepgram. Requires `DEEPGRAM_API_KEY`
- * and `yt-dlp` on the server (`nixpacks.toml` and/or `postinstall` script).
- * YouTube bot duvarı icin: android -> mweb -> android_vr fallback.
- * Kalici cozum: Netscape cerezleri `YOUTUBE_COOKIES` (icerik) veya `YOUTUBE_COOKIES_PATH` (dosya).
- */
 export async function fetchTranscriptViaDeepgram(
   videoId: string,
 ): Promise<TranscriptResponse[]> {
