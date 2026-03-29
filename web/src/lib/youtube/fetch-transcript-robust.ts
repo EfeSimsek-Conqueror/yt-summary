@@ -2,9 +2,9 @@ import { Innertube } from "youtubei.js";
 import type { TranscriptResponse } from "youtube-transcript";
 import {
   fetchTranscript,
-  YoutubeTranscriptError,
   YoutubeTranscriptNotAvailableError,
   YoutubeTranscriptTooManyRequestError,
+  YoutubeTranscriptVideoUnavailableError,
 } from "youtube-transcript";
 import { parseYoutubeVideoId } from "./video-id";
 import {
@@ -12,8 +12,10 @@ import {
   youtubeLikeFetch,
 } from "./youtube-transcript-fetch";
 
-const TRANSCRIPT_RATE_LIMIT_RETRIES = 3;
-const TRANSCRIPT_RATE_LIMIT_BASE_DELAY_MS = 1500;
+const TRANSCRIPT_RATE_LIMIT_RETRIES = 5;
+const TRANSCRIPT_RATE_LIMIT_BASE_DELAY_MS = 3000;
+/** Space out language fallback attempts (same IP bursts trigger reCAPTCHA). */
+const LANG_FALLBACK_GAP_MS = 400;
 
 /** `youtube-transcript` is usually fast; cap so we never block the whole request forever. */
 const FETCH_TRANSCRIPT_TIMEOUT_MS = 22_000;
@@ -22,17 +24,49 @@ const INNERTUBE_CAPTION_TIMEOUT_MS = 120_000;
 
 let innertubePromise: Promise<Innertube> | null = null;
 
-/** YouTube often returns `caption_tracks` for one client but not another (esp. server/datacenter IPs). */
+/** Fewer `getInfo` rounds = less burst to YouTube per request (rate limits). */
 const INNERTUBE_CAPTION_CLIENTS = [
   "WEB",
+  "ANDROID",
   "WEB_EMBEDDED",
   "MWEB",
-  "ANDROID",
-  "IOS",
 ] as const;
 
-function errBrief(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
+function delay(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * Watch-page fetch hit reCAPTCHA / rate limit. Cool down and retry caption URLs only
+ * (no HTML scrape — avoids repeating the trigger).
+ */
+async function recoverFromRateLimit(
+  videoIdRaw: string,
+  vid: string,
+  original: YoutubeTranscriptTooManyRequestError,
+): Promise<TranscriptResponse[]> {
+  const cooldownsMs = [4000, 9000, 16000];
+  for (let i = 0; i < cooldownsMs.length; i++) {
+    await delay(cooldownsMs[i]!);
+    try {
+      const rows = await withTimeout(
+        fetchTranscriptViaYoutubei(videoIdRaw),
+        INNERTUBE_CAPTION_TIMEOUT_MS,
+        vid,
+        true,
+      );
+      if (rows.length > 0) {
+        console.warn(
+          "[video-analysis] transcript: innertube ok after rate-limit cooldown",
+          vid,
+        );
+        return rows;
+      }
+    } catch {
+      /* try next cooldown */
+    }
+  }
+  throw original;
 }
 
 function getInnertube(): Promise<Innertube> {
@@ -280,20 +314,15 @@ async function fetchTranscriptWithLanguageFallbacks(
   const langTries: Array<{ lang: string }> = [
     { lang: "en" },
     { lang: "en-US" },
-    { lang: "en-GB" },
     { lang: "tr" },
     { lang: "de" },
     { lang: "fr" },
     { lang: "es" },
-    { lang: "it" },
-    { lang: "pt" },
-    { lang: "pt-BR" },
-    { lang: "ja" },
-    { lang: "ko" },
-    { lang: "hi" },
   ];
   let lastErr: unknown;
-  for (const cfg of langTries) {
+  for (let i = 0; i < langTries.length; i++) {
+    const cfg = langTries[i]!;
+    if (i > 0) await delay(LANG_FALLBACK_GAP_MS);
     try {
       const rows = await withTimeout(
         fetchTranscript(videoIdRaw, { ...transcriptFetchOpts, ...cfg }),
@@ -317,24 +346,25 @@ async function fetchTranscriptWithLanguageFallbacks(
   return [];
 }
 
-/** Retries 2..N after the first attempt already failed with rate limit. */
+/** Last resort: long backoff + `youtube-transcript` only (watch page). */
 async function fetchTranscriptRateLimitRetries(
   videoId: string,
 ): Promise<TranscriptResponse[]> {
-  for (let attempt = 2; attempt <= TRANSCRIPT_RATE_LIMIT_RETRIES; attempt++) {
-    const delayMs =
-      TRANSCRIPT_RATE_LIMIT_BASE_DELAY_MS * 2 ** (attempt - 1);
+  const id = parseYoutubeVideoId(videoId) ?? videoId.trim();
+  for (let attempt = 1; attempt <= TRANSCRIPT_RATE_LIMIT_RETRIES; attempt++) {
+    const delayMs = TRANSCRIPT_RATE_LIMIT_BASE_DELAY_MS * 2 ** (attempt - 1);
     console.warn(
-      `[video-analysis] transcript rate limited, retry ${attempt}/${TRANSCRIPT_RATE_LIMIT_RETRIES} in ${delayMs}ms`,
+      `[video-analysis] transcript: rate-limit backoff retry ${attempt}/${TRANSCRIPT_RATE_LIMIT_RETRIES} in ${delayMs}ms`,
     );
-    await new Promise((r) => setTimeout(r, delayMs));
+    await delay(delayMs);
     try {
-      return await withTimeout(
+      const rows = await withTimeout(
         fetchTranscript(videoId, transcriptFetchOpts),
         FETCH_TRANSCRIPT_TIMEOUT_MS,
-        parseYoutubeVideoId(videoId) ?? videoId.trim(),
+        id,
         false,
       );
+      if (rows.length > 0) return rows;
     } catch (e) {
       if (
         e instanceof YoutubeTranscriptTooManyRequestError &&
@@ -345,109 +375,66 @@ async function fetchTranscriptRateLimitRetries(
       throw e;
     }
   }
-  throw new Error("fetchTranscriptRateLimitRetries: unreachable");
+  throw new YoutubeTranscriptTooManyRequestError();
 }
 
 /**
- * Runs `youtube-transcript` and `youtubei.js` **in parallel** so we do not wait
- * for transcript retries/backoff before trying Innertube (major latency win).
+ * Sequential: Innertube caption URLs first (no watch-page reCAPTCHA), then
+ * `youtube-transcript`. Parallel was hammering YouTube and triggering rate limits.
  */
 export async function fetchTranscriptRobust(
   videoIdRaw: string,
 ): Promise<TranscriptResponse[]> {
   const vid = parseYoutubeVideoId(videoIdRaw) ?? videoIdRaw.trim();
-  const parallel = await Promise.allSettled([
-    withTimeout(
-      fetchTranscript(videoIdRaw, transcriptFetchOpts),
-      FETCH_TRANSCRIPT_TIMEOUT_MS,
-      vid,
-      false,
-    ),
-    withTimeout(
+
+  try {
+    const fromY = await withTimeout(
       fetchTranscriptViaYoutubei(videoIdRaw),
       INNERTUBE_CAPTION_TIMEOUT_MS,
       vid,
       true,
-    ),
-  ]);
-
-  const fromT =
-    parallel[0].status === "fulfilled" ? parallel[0].value : null;
-  const fromY =
-    parallel[1].status === "fulfilled" ? parallel[1].value : null;
-  const errT =
-    parallel[0].status === "rejected" ? parallel[0].reason : undefined;
-  const errY =
-    parallel[1].status === "rejected" ? parallel[1].reason : undefined;
-
-  if (fromT && fromT.length > 0) {
-    return fromT;
-  }
-  if (fromY && fromY.length > 0) {
-    const vid = parseYoutubeVideoId(videoIdRaw) ?? videoIdRaw;
-    console.warn(
-      "[video-analysis] transcript: using innertube caption URLs (youtube-transcript empty/failed)",
-      vid,
     );
-    return fromY;
+    if (fromY.length > 0) {
+      console.warn("[video-analysis] transcript: innertube-first path ok", vid);
+      return fromY;
+    }
+  } catch (e) {
+    if (e instanceof YoutubeTranscriptTooManyRequestError) throw e;
+    if (e instanceof YoutubeTranscriptVideoUnavailableError) throw e;
+  }
+
+  try {
+    const fromT = await withTimeout(
+      fetchTranscript(videoIdRaw, transcriptFetchOpts),
+      FETCH_TRANSCRIPT_TIMEOUT_MS,
+      vid,
+      false,
+    );
+    if (fromT.length > 0) return fromT;
+  } catch (e) {
+    if (e instanceof YoutubeTranscriptTooManyRequestError) {
+      try {
+        return await recoverFromRateLimit(videoIdRaw, vid, e);
+      } catch {
+        return await fetchTranscriptRateLimitRetries(videoIdRaw);
+      }
+    }
+    if (e instanceof YoutubeTranscriptVideoUnavailableError) throw e;
   }
 
   try {
     const viaLang = await fetchTranscriptWithLanguageFallbacks(videoIdRaw);
-    if (viaLang.length > 0) {
-      return viaLang;
-    }
+    if (viaLang.length > 0) return viaLang;
   } catch (e) {
     if (e instanceof YoutubeTranscriptTooManyRequestError) {
       try {
+        return await recoverFromRateLimit(videoIdRaw, vid, e);
+      } catch {
         return await fetchTranscriptRateLimitRetries(videoIdRaw);
-      } catch (retryErr) {
-        console.warn(
-          "[video-analysis] transcript: rate-limit retry failed",
-          parseYoutubeVideoId(videoIdRaw) ?? videoIdRaw,
-          {
-            youtubeTranscript: errBrief(errT),
-            innertubeCaptions: errBrief(errY),
-          },
-        );
-        throw retryErr;
       }
     }
+    throw e;
   }
 
-  if (errT instanceof YoutubeTranscriptTooManyRequestError) {
-    try {
-      return await fetchTranscriptRateLimitRetries(videoIdRaw);
-    } catch (retryErr) {
-      console.warn(
-        "[video-analysis] transcript: rate-limit retry failed",
-        parseYoutubeVideoId(videoIdRaw) ?? videoIdRaw,
-        {
-          youtubeTranscript: errBrief(errT),
-          innertubeCaptions: errBrief(errY),
-        },
-      );
-      throw retryErr;
-    }
-  }
-
-  if (errT instanceof YoutubeTranscriptError) {
-    console.warn(
-      "[video-analysis] transcript: youtube-transcript failed (innertube state below)",
-      parseYoutubeVideoId(videoIdRaw) ?? videoIdRaw,
-      { innertubeCaptions: errBrief(errY) },
-    );
-    throw errT;
-  }
-  if (errY instanceof YoutubeTranscriptError) {
-    throw errY;
-  }
-  if (errT || errY) {
-    console.warn("[video-analysis] transcript: all automatic sources failed", vid, {
-      youtubeTranscript: errBrief(errT),
-      innertubeCaptions: errBrief(errY),
-    });
-    throw new YoutubeTranscriptNotAvailableError(vid);
-  }
   throw new YoutubeTranscriptNotAvailableError(vid);
 }

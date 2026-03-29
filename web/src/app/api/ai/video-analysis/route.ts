@@ -37,7 +37,11 @@ const MAX_MODEL_INPUT = 100_000;
 
 function mapTranscriptError(e: unknown): { status: number; message: string } {
   if (e instanceof YoutubeTranscriptTooManyRequestError) {
-    return { status: 429, message: "YouTube rate limit; try again later." };
+    return {
+      status: 429,
+      message:
+        "YouTube is limiting requests from this server (often after many transcript fetches). Wait a few minutes and try again.",
+    };
   }
   if (e instanceof YoutubeTranscriptVideoUnavailableError) {
     return { status: 404, message: "Video is unavailable." };

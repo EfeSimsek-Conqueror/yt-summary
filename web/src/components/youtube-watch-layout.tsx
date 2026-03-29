@@ -56,9 +56,10 @@ function segmentAnalysisBlockedReason(error: string): string {
   }
   if (
     error.includes("rate limit") ||
+    error.includes("Limiting requests") ||
     error.includes("try again later")
   ) {
-    return "YouTube limited transcript requests. Wait a minute and tap Run analysis again.";
+    return "YouTube is throttling requests from the server. Wait a few minutes, then tap Run analysis again.";
   }
   return `${error} Check the message next to the button and use Run analysis to retry.`;
 }
