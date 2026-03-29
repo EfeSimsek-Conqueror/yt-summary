@@ -60,6 +60,8 @@ export type AnalysisPayload = {
   summaryShort: string;
   revelations: string[];
   keyPoints: string[];
+  /** Short chronological highlights (e.g. goals, beats); max 5 from the model. */
+  keyMoments: string[];
   segments: Segment[];
   hypeMoments: AnalysisHypeMoment[];
   /** Set when no captions and on-screen analysis supplemented thin speech transcript. */

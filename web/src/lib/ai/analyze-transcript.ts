@@ -110,6 +110,21 @@ const analysisSchema = z.object({
     (v) => (Array.isArray(v) ? v : []),
     z.array(z.string()).max(15),
   ),
+  /**
+   * 1–5 chronological one-line beats for every video (sports, tutorials, music, etc.).
+   * Prompt instructs the model never to omit this for normal content.
+   */
+  key_moments: z.preprocess(
+    (v) =>
+      Array.isArray(v)
+        ? v
+            .filter((x): x is string => typeof x === "string")
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .slice(0, 5)
+        : [],
+    z.array(z.string()).max(5),
+  ),
   segments: z.array(segmentSchema).max(10),
   /**
    * Music videos / performances: timestamps where energy peaks (drops, chorus hits,
@@ -139,6 +154,38 @@ const analysisSchema = z.object({
 
 export type TranscriptAnalysis = z.infer<typeof analysisSchema>;
 
+/**
+ * If the model returned no key_moments, derive up to 5 short lines from the written
+ * summary so the UI always has a Key moments block for every video.
+ */
+function fillKeyMomentsIfNeeded(data: TranscriptAnalysis): TranscriptAnalysis {
+  if (data.key_moments.length > 0) {
+    return data;
+  }
+  const detailed = data.summary_detailed.trim();
+  const lines: string[] = [];
+  const paragraphs = detailed.split(/\n+/).map((p) => p.trim()).filter(Boolean);
+  for (const block of paragraphs) {
+    const sentences = block
+      .split(/(?<=[.!?])\s+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length >= 12);
+    for (const s of sentences) {
+      lines.push(s.length > 220 ? `${s.slice(0, 217)}…` : s);
+      if (lines.length >= 5) break;
+    }
+    if (lines.length >= 5) break;
+  }
+  if (lines.length === 0) {
+    const one = data.summary_short.trim();
+    if (one) lines.push(one);
+  }
+  if (lines.length === 0) {
+    return data;
+  }
+  return { ...data, key_moments: lines.slice(0, 5) };
+}
+
 const INSTRUCTIONS = `You analyze YouTube (or similar) video transcripts.
 
 Return ONLY raw JSON (no markdown code fences, no commentary) with this exact shape:
@@ -149,6 +196,7 @@ Return ONLY raw JSON (no markdown code fences, no commentary) with this exact sh
   "summary_detailed": "Plain text, use \\n between paragraphs. Target about 200–280 words (roughly 250)—not much shorter unless the video is extremely short; do not exceed ~280 words.",
   "revelations": ["One-line twist or secret from the video", "Another if any"],
   "key_points": ["For tutorials/news: fact or step as a direct bullet", "Or empty array if this is pure fiction recap"],
+  "key_moments": ["4' — Spain opens the scoring (1-0)", "Turkey equalizes through Gül (1-1)", "Özcan puts Turkey ahead (2-1)"],
   "segments": [
     {
       "start_sec": 0,
@@ -171,6 +219,7 @@ Rules:
 - summary_detailed: REQUIRED. Length ~200–280 words (about 250). Same language as the transcript when possible. NOT a transcript dump—no long quotes. For tv_episode / film_recap / fiction_other: write as a clear recap (“This happens, then…”, who does what). For tutorial/news/podcast: structured explanation with main ideas; you may still use short paragraphs. Do not pad with filler.
 - revelations: Each item ONE short sentence for a twist, secret, ending reveal, or “what you need to know” spoiler. Use [] if none. Do not repeat summary_detailed verbatim—extract the punchiest reveals.
 - key_points: For informative content, list direct, scannable facts or steps (no fluff). Use [] for pure fiction recaps. When both apply, fill both (e.g. review of a film: key_points for critique bullets, revelations for plot spoilers).
+- key_moments: **Required for every video**—always output **1–5** one-line strings in chronological order (never skip this field with an empty array unless the transcript has essentially no usable content). Same language as the transcript when possible. Adapt by content_kind: sports/news—goals, lead changes, turning points; tv/film/fiction—plot beats; tutorial—numbered steps or main ideas in order; podcast/interview—topic shifts or standout exchanges; review—verdict beats; vlog—main stops or emotional beats; **music**—short section/energy labels in order (e.g. intro, verse, chorus, bridge, outro) even though hype_moments carries timestamps—do not leave key_moments empty for MVs. Include a minute mark or rough phase when timing exists (e.g. \"12' — …\"). Prefer 3–5 items for videos longer than a few minutes; 1–2 for very short clips.
 - summary_short: One line; if has_spoilers, avoid spoiling the ending in this line.
 - At most 10 segments.
 - start_sec and end_sec are seconds from the start of the video; use the transcript's timeline. If timestamps are missing, estimate sensible ranges that cover the full narrative in order.
@@ -357,5 +406,5 @@ export async function analyzeTranscriptWithGeminiFlash(input: {
     throw new Error(`Invalid analysis shape: ${result.error.message}`);
   }
 
-  return result.data;
+  return fillKeyMomentsIfNeeded(result.data);
 }

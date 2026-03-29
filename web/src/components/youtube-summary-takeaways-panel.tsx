@@ -200,6 +200,20 @@ export function YoutubeSummaryTakeawaysPanel({
                 <p className="whitespace-pre-wrap">
                   {analysis.summaryDetailed}
                 </p>
+                {analysis.keyMoments.length > 0 ? (
+                  <div className="mt-4 border-t border-line pt-4">
+                    <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                      Key moments
+                    </h3>
+                    <ol className="list-decimal space-y-1.5 pl-5 marker:text-muted">
+                      {analysis.keyMoments.map((line, i) => (
+                        <li key={i} className="pl-0.5 text-left">
+                          {line}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                ) : null}
                 {analysis.revelations.length > 0 ? (
                   <div className="border-t border-line pt-4">
                     <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">

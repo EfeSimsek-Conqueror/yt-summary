@@ -1,0 +1,4 @@
+# yt-dlp + ffmpeg: YouTube audio download for Deepgram transcription (see transcript-via-deepgram.ts).
+# "..." keeps Nixpacks’ default setup packages (Node/npm toolchain); without it, npm ci can fail.
+[phases.setup]
+nixPkgs = ["...", "yt-dlp", "ffmpeg"]

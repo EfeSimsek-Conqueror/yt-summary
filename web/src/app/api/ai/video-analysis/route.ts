@@ -19,8 +19,8 @@ import {
   YoutubeTranscriptVideoUnavailableError,
 } from "youtube-transcript";
 
-/** Caption fetch + analysis LLM call. */
-export const maxDuration = 300;
+/** Caption fetch (incl. optional yt-dlp + Deepgram) + analysis LLM call. */
+export const maxDuration = 900;
 
 const MIN_TRANSCRIPT_PLAIN_CHARS = 400;
 
@@ -40,7 +40,7 @@ function mapTranscriptError(e: unknown): { status: number; message: string } {
     return {
       status: 429,
       message:
-        "YouTube is rate-limiting this server. Wait several minutes before trying again. Avoid spamming “Run analysis”; the same video’s captions are cached for a while after a successful fetch.",
+        "YouTube is rate-limiting caption requests from this server, and optional audio→Deepgram transcription is not configured (set DEEPGRAM_API_KEY) or also failed. Wait several minutes before retrying the same video; successful captions are cached for a while.",
     };
   }
   if (e instanceof YoutubeTranscriptVideoUnavailableError) {
@@ -50,17 +50,33 @@ function mapTranscriptError(e: unknown): { status: number; message: string } {
     return {
       status: 422,
       message:
-        "Caption fetch failed: YouTube may not send caption data to this server (subtitles in the player can still work). Retry in a few minutes, or paste at least 400 characters of transcript as transcriptPlain.",
+        "YouTube did not expose captions to this server for this video (uploader disabled captions or regional limits). Try another video or again later.",
     };
   }
   if (e instanceof YoutubeTranscriptNotAvailableLanguageError) {
     return {
       status: 422,
-      message: e.message,
+      message:
+        "Could not load captions automatically. Try again in a minute or use a different video.",
     };
   }
   if (e instanceof YoutubeTranscriptNotAvailableError) {
     return { status: 422, message: "No captions available for this video." };
+  }
+  const msg = e instanceof Error ? e.message : "";
+  if (msg.includes("No transcripts are available in")) {
+    return {
+      status: 422,
+      message:
+        "Could not load captions automatically. Try again in a minute or use a different video.",
+    };
+  }
+  if (msg.includes("Transcript is disabled")) {
+    return {
+      status: 422,
+      message:
+        "YouTube did not expose captions to this server for this video. Try another video or again later.",
+    };
   }
   return {
     status: 502,
@@ -119,7 +135,11 @@ export async function POST(request: NextRequest) {
       items = await fetchTranscriptRobust(parsed.data.videoId);
     } catch (e) {
       transcriptFetchError = mapTranscriptError(e);
-      console.error("[video-analysis] transcript", e);
+      if (transcriptFetchError.status >= 500) {
+        console.error("[video-analysis] transcript", e);
+      } else {
+        console.warn("[video-analysis] transcript", transcriptFetchError.message);
+      }
     }
 
     const clientPlain = parsed.data.transcriptPlain?.trim();
@@ -155,7 +175,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "No transcript text. Captions were empty; add transcriptPlain (paste) or try another video.",
+            "No transcript text. Captions were empty — try another video or again later.",
         },
         { status: 422 },
       );
@@ -174,6 +194,7 @@ export async function POST(request: NextRequest) {
       summaryShort: analysis.summary_short,
       revelations: analysis.revelations,
       keyPoints: analysis.key_points,
+      keyMoments: analysis.key_moments,
       segments: analysis.segments,
       hypeMoments: analysis.hype_moments,
       transcriptDensityScore: null,

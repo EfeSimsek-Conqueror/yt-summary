@@ -1,19 +1,17 @@
 import { Innertube } from "youtubei.js";
 import type { TranscriptResponse } from "youtube-transcript";
 import {
-  fetchTranscript,
   YoutubeTranscriptNotAvailableError,
   YoutubeTranscriptTooManyRequestError,
   YoutubeTranscriptVideoUnavailableError,
 } from "youtube-transcript";
 import { parseYoutubeVideoId } from "./video-id";
 import {
-  transcriptFetchOpts,
-  youtubeLikeFetch,
-} from "./youtube-transcript-fetch";
-
-/** Space out language fallback attempts (same IP bursts trigger reCAPTCHA). */
-const LANG_FALLBACK_GAP_MS = 400;
+  fetchTranscriptViaDeepgram,
+  getDeepgramApiKey,
+} from "./transcript-via-deepgram";
+import { fetchTranscriptViaPlayerApi } from "./youtube-player-transcript";
+import { youtubeLikeFetch } from "./youtube-transcript-fetch";
 
 /** Reuse transcript for the same video to avoid repeat YouTube hits (rate limits). */
 const TRANSCRIPT_CACHE_TTL_MS = 45 * 60 * 1000;
@@ -43,6 +41,8 @@ function trimTranscriptCache() {
 const FETCH_TRANSCRIPT_TIMEOUT_MS = 22_000;
 /** Innertube: multiple `getInfo` clients + caption fetches (no `/get_transcript`). */
 const INNERTUBE_CAPTION_TIMEOUT_MS = 120_000;
+/** yt-dlp download + Deepgram prerecorded (no Innertube reset on timeout). */
+const DEEPGRAM_FETCH_TIMEOUT_MS = 14 * 60 * 1000;
 
 let innertubePromise: Promise<Innertube> | null = null;
 
@@ -89,7 +89,7 @@ async function recoverFromRateLimit(
       /* try next cooldown */
     }
   }
-  throw original;
+  return [];
 }
 
 function getInnertube(): Promise<Innertube> {
@@ -327,56 +327,32 @@ async function fetchTranscriptViaYoutubei(
 }
 
 /**
- * YouTube often omits `captionTracks` in server-side HTML unless a language is requested.
- * Tries common tracks after the default fetch failed (false "disabled" in the UI).
- */
-async function fetchTranscriptWithLanguageFallbacks(
-  videoIdRaw: string,
-): Promise<TranscriptResponse[]> {
-  const id = parseYoutubeVideoId(videoIdRaw) ?? videoIdRaw.trim();
-  const langTries: Array<{ lang: string }> = [
-    { lang: "en" },
-    { lang: "en-US" },
-    { lang: "tr" },
-    { lang: "de" },
-    { lang: "fr" },
-    { lang: "es" },
-  ];
-  let lastErr: unknown;
-  for (let i = 0; i < langTries.length; i++) {
-    const cfg = langTries[i]!;
-    if (i > 0) await delay(LANG_FALLBACK_GAP_MS);
-    try {
-      const rows = await withTimeout(
-        fetchTranscript(videoIdRaw, { ...transcriptFetchOpts, ...cfg }),
-        FETCH_TRANSCRIPT_TIMEOUT_MS,
-        id,
-        false,
-      );
-      if (rows?.length) {
-        console.warn(
-          `[video-analysis] transcript language fallback ok (${cfg.lang})`,
-          id,
-        );
-        return rows;
-      }
-    } catch (e) {
-      lastErr = e;
-      if (e instanceof YoutubeTranscriptTooManyRequestError) throw e;
-    }
-  }
-  if (lastErr) throw lastErr;
-  return [];
-}
-
-/**
- * Sequential: Innertube caption URLs first (no watch-page reCAPTCHA), then
- * `youtube-transcript`. Parallel was hammering YouTube and triggering rate limits.
+ * When `DEEPGRAM_API_KEY` is set: **yt-dlp + Deepgram** first, then Innertube captions, then
+ * player timedtext. Otherwise: Innertube → player (no `youtube-transcript` lang foot-gun).
  */
 async function fetchTranscriptOnce(
   videoIdRaw: string,
 ): Promise<TranscriptResponse[]> {
   const vid = parseYoutubeVideoId(videoIdRaw) ?? videoIdRaw.trim();
+  /** YouTube caption paths rate-limited; Deepgram avoids that when configured. */
+  let youtubeRateLimited = false;
+
+  if (getDeepgramApiKey()) {
+    try {
+      const fromDg = await withTimeout(
+        fetchTranscriptViaDeepgram(vid),
+        DEEPGRAM_FETCH_TIMEOUT_MS,
+        vid,
+        false,
+      );
+      if (fromDg.length > 0) {
+        console.warn("[video-analysis] transcript: deepgram ok (primary)", vid);
+        return fromDg;
+      }
+    } catch {
+      /* yt-dlp missing, Deepgram error, or timeout — fall back to YouTube captions */
+    }
+  }
 
   try {
     const fromY = await withTimeout(
@@ -386,37 +362,42 @@ async function fetchTranscriptOnce(
       true,
     );
     if (fromY.length > 0) {
-      console.warn("[video-analysis] transcript: innertube-first path ok", vid);
+      console.warn("[video-analysis] transcript: innertube ok", vid);
       return fromY;
     }
   } catch (e) {
-    if (e instanceof YoutubeTranscriptTooManyRequestError) throw e;
-    if (e instanceof YoutubeTranscriptVideoUnavailableError) throw e;
+    if (e instanceof YoutubeTranscriptTooManyRequestError) {
+      youtubeRateLimited = true;
+    } else if (e instanceof YoutubeTranscriptVideoUnavailableError) {
+      throw e;
+    }
   }
 
   try {
     const fromT = await withTimeout(
-      fetchTranscript(videoIdRaw, transcriptFetchOpts),
+      fetchTranscriptViaPlayerApi(videoIdRaw),
       FETCH_TRANSCRIPT_TIMEOUT_MS,
       vid,
       false,
     );
-    if (fromT.length > 0) return fromT;
+    if (fromT.length > 0) {
+      console.warn("[video-analysis] transcript: player-api timedtext ok", vid);
+      return fromT;
+    }
   } catch (e) {
     if (e instanceof YoutubeTranscriptTooManyRequestError) {
-      return await recoverFromRateLimit(videoIdRaw, vid, e);
+      youtubeRateLimited = true;
+      const recovered = await recoverFromRateLimit(videoIdRaw, vid, e);
+      if (recovered.length > 0) {
+        return recovered;
+      }
+    } else if (e instanceof YoutubeTranscriptVideoUnavailableError) {
+      throw e;
     }
-    if (e instanceof YoutubeTranscriptVideoUnavailableError) throw e;
   }
 
-  try {
-    const viaLang = await fetchTranscriptWithLanguageFallbacks(videoIdRaw);
-    if (viaLang.length > 0) return viaLang;
-  } catch (e) {
-    if (e instanceof YoutubeTranscriptTooManyRequestError) {
-      return await recoverFromRateLimit(videoIdRaw, vid, e);
-    }
-    throw e;
+  if (youtubeRateLimited && !getDeepgramApiKey()) {
+    throw new YoutubeTranscriptTooManyRequestError();
   }
 
   throw new YoutubeTranscriptNotAvailableError(vid);

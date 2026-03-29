@@ -6,6 +6,7 @@ import Image from "next/image";
 import { RotateCw, ThumbsUp } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { YoutubeIframePlayer } from "@/components/youtube-iframe-player";
+import { VideoAssistantChat } from "@/components/video-assistant-chat";
 import { YoutubeSummaryTakeawaysPanel } from "@/components/youtube-summary-takeaways-panel";
 import type {
   AnalysisHypeMoment,
@@ -21,15 +22,16 @@ import {
 import { formatSecondsAsMmSs, segmentStartSeconds } from "@/lib/segment-time";
 import { isLikelyYoutubeVideoId } from "@/lib/youtube/video-id";
 import { parseDurationLabelToSeconds } from "@/lib/youtube/iso-duration";
+import {
+  shouldRetryVideoAnalysisWithBrowserTranscript,
+  tryPlainTranscriptFromBrowserCaptionFetch,
+} from "@/lib/youtube/client-transcript-fallback";
 
 const thumbGradients = [
   "from-slate-600 to-slate-900",
   "from-indigo-600 to-slate-900",
   "from-emerald-700 to-slate-900",
 ];
-
-/** Matches POST /api/ai/video-analysis `transcriptPlain` minimum. */
-const MIN_TRANSCRIPT_PASTE_CHARS = 400;
 
 function thumbClass(id: string) {
   const i =
@@ -48,15 +50,17 @@ function segmentAnalysisBlockedReason(error: string): string {
     error.includes("Could not load captions from YouTube") ||
     error.includes("Caption fetch failed") ||
     error.includes("Automatic caption fetch failed") ||
-    error.includes("YouTube often does not expose caption data")
+    error.includes("YouTube often does not expose caption data") ||
+    error.includes("Captions are not available to our server") ||
+    error.includes("Show transcript")
   ) {
-    return "YouTube often omits caption data for automated server requests (the in-app player can still show subtitles). Wait and try again, or paste at least 400 characters in “Paste transcript” below and run analysis.";
+    return "YouTube may not expose captions to this server (the in-app player can still show subtitles). Try again in a few minutes or another video.";
   }
   if (error.includes("No captions available")) {
-    return "No usable caption text was returned for this video. Try another video or paste transcript text if available.";
+    return "No caption text was returned for this video. Try another video or refresh the page.";
   }
   if (error.includes("Transcript is empty")) {
-    return "The transcript came back empty. Try Run analysis again, or pick a different video.";
+    return "The transcript came back empty. Refresh the page or pick a different video.";
   }
   if (
     error.includes("rate limit") ||
@@ -66,7 +70,7 @@ function segmentAnalysisBlockedReason(error: string): string {
   ) {
     return "YouTube is throttling the server. Wait several minutes. Don’t hammer Run analysis — the same video’s captions are cached briefly after a success.";
   }
-  return `${error} Check the message next to the button and use Run analysis to retry.`;
+  return `${error} Retry from the segment panel or refresh the page.`;
 }
 
 type Props = {
@@ -207,7 +211,6 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
   /** True after ~22s so we don't pretend we're stuck at one fake %. */
   const [analysisProgressSlow, setAnalysisProgressSlow] = useState(false);
   /** Optional pasted transcript when YouTube won’t serve captions to the server (API: transcriptPlain, min 400 chars). */
-  const [transcriptPaste, setTranscriptPaste] = useState("");
 
   const canEmbed = isLikelyYoutubeVideoId(video.id);
 
@@ -260,7 +263,6 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
     setPlayhead(0);
     playerRef.current = null;
     setWatchFullscreen(false);
-    setTranscriptPaste("");
     if (typeof document !== "undefined" && document.fullscreenElement) {
       void document.exitFullscreen().catch(() => {});
     }
@@ -353,22 +355,48 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
       setAnalysisError(null);
       try {
         const durationSec = parseDurationLabelToSeconds(video.durationLabel);
-        const plain = transcriptPaste.trim();
-        const res = await fetch("/api/ai/video-analysis", {
+        const bodyBase = {
+          videoId: video.id,
+          videoTitle: video.title,
+          ...(durationSec != null ? { durationSec } : {}),
+          durationLabel: video.durationLabel,
+        };
+
+        let res = await fetch("/api/ai/video-analysis", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            videoId: video.id,
-            videoTitle: video.title,
-            ...(durationSec != null ? { durationSec } : {}),
-            durationLabel: video.durationLabel,
-            ...(plain.length >= MIN_TRANSCRIPT_PASTE_CHARS
-              ? { transcriptPlain: plain }
-              : {}),
-          }),
+          body: JSON.stringify(bodyBase),
           signal,
         });
-        const data: unknown = await res.json().catch(() => ({}));
+        let data: unknown = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          const errFirst =
+            typeof (data as { error?: string }).error === "string"
+              ? (data as { error: string }).error
+              : "Request failed";
+          if (
+            shouldRetryVideoAnalysisWithBrowserTranscript(res.status, errFirst)
+          ) {
+            const browserPlain = await tryPlainTranscriptFromBrowserCaptionFetch(
+              video.id,
+              signal,
+            );
+            if (browserPlain) {
+              res = await fetch("/api/ai/video-analysis", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  ...bodyBase,
+                  transcriptPlain: browserPlain,
+                }),
+                signal,
+              });
+              data = await res.json().catch(() => ({}));
+            }
+          }
+        }
+
         if (!res.ok) {
           const err =
             typeof (data as { error?: string }).error === "string"
@@ -384,6 +412,7 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
           summaryShort?: string;
           revelations?: unknown;
           keyPoints?: unknown;
+          keyMoments?: unknown;
           segments?: ApiSegment[];
           hypeMoments?: unknown;
           usedVisualFallback?: boolean;
@@ -394,6 +423,11 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
           : [];
         const keyPoints = Array.isArray(d.keyPoints)
           ? d.keyPoints.filter((x): x is string => typeof x === "string")
+          : [];
+        const keyMoments = Array.isArray(d.keyMoments)
+          ? d.keyMoments
+              .filter((x): x is string => typeof x === "string")
+              .slice(0, 5)
           : [];
         const rawKind =
           typeof d.contentKind === "string" ? d.contentKind : "other";
@@ -415,6 +449,7 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
           summaryShort: d.summaryShort,
           revelations,
           keyPoints,
+          keyMoments,
           segments: mapApiSegments(d.segments),
           hypeMoments: mapApiHypeMoments(d.hypeMoments),
           usedVisualFallback: Boolean(d.usedVisualFallback),
@@ -436,7 +471,7 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
         }
       }
     },
-    [video.id, video.title, video.durationLabel, transcriptPaste],
+    [video.id, video.title, video.durationLabel],
   );
 
   const retrySegmentAnalysis = useCallback(() => {
@@ -709,6 +744,24 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
                 })}
               </ul>
             )}
+            <div className="mt-5">
+              {analysis ? (
+                <VideoAssistantChat
+                  key={video.id}
+                  videoId={video.id}
+                  videoTitle={video.title}
+                  analysis={analysis}
+                  canSeek={canJump}
+                  onSeek={seekTo}
+                  formatSecondsAsMmSs={formatSecondsAsMmSs}
+                />
+              ) : (
+                <div className="rounded-xl border border-dashed border-line/70 bg-surface/40 px-3 py-3 text-[11px] leading-relaxed text-muted">
+                  After analysis finishes, Video AI chat appears here — ask to jump
+                  to hype moments, goals, segments, or anything about this video.
+                </div>
+              )}
+            </div>
       </aside>
 
       <div className="order-1 min-w-0 space-y-6 lg:order-none">
@@ -817,85 +870,6 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
               ? "Video plays above; segment jump needs Retry (interactive player)"
               : "Click a segment to jump in the player"}
         </p>
-
-        {canEmbed ? (
-          <div className="mb-4 space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                disabled={analysisBusy}
-                onClick={() => void runVideoAnalysis()}
-                className="rounded-lg border border-line bg-raised px-3 py-2 text-sm font-medium text-foreground transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {analysisBusy
-                  ? "Running analysis…"
-                  : analysis
-                    ? "Run analysis again"
-                    : "Run analysis"}
-              </button>
-              {analysisError ? (
-                <span className="text-sm text-red-600 dark:text-red-400">
-                  {analysisError}
-                </span>
-              ) : null}
-            </div>
-            {analysisBusy && !hasAnalysisSegments ? (
-              <div
-                className="max-w-md space-y-1"
-                role="progressbar"
-                aria-valuenow={analysisProgressPct}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-label="Estimated analysis progress"
-              >
-                <div className="h-2.5 w-full overflow-hidden rounded-full border border-line bg-white/10">
-                  <div
-                    className="h-full min-h-[6px] rounded-full bg-accent shadow-[0_0_12px_rgba(59,130,246,0.35)] transition-[width] duration-300 ease-out"
-                    style={{ width: `${analysisProgressPct}%` }}
-                  />
-                </div>
-                <p className="text-[11px] tabular-nums text-muted">
-                  <span className="font-medium text-foreground/90">
-                    {analysisProgressPct}%
-                  </span>
-                  <span className="opacity-75"> · estimated</span>
-                </p>
-                {analysisProgressSlow ? (
-                  <p className="text-[11px] leading-snug text-muted">
-                    Still working — caption fetch or retries may take a while
-                    before the AI step.
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-            <div className="max-w-xl space-y-1.5">
-              <label
-                htmlFor="transcript-paste-fallback"
-                className="block text-[11px] font-medium uppercase tracking-wide text-muted"
-              >
-                Paste transcript (fallback)
-              </label>
-              <p className="text-[11px] leading-snug text-muted">
-                If automatic captions fail, paste YouTube’s transcript here
-                (open transcript on YouTube → copy). Sent only if{" "}
-                {MIN_TRANSCRIPT_PASTE_CHARS}+ characters.
-              </p>
-              <textarea
-                id="transcript-paste-fallback"
-                value={transcriptPaste}
-                onChange={(e) => setTranscriptPaste(e.target.value)}
-                rows={4}
-                disabled={analysisBusy}
-                placeholder="Paste transcript text…"
-                className="w-full resize-y rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-foreground placeholder:text-muted/70 disabled:opacity-60"
-              />
-              <p className="text-[11px] tabular-nums text-muted">
-                {transcriptPaste.trim().length} / {MIN_TRANSCRIPT_PASTE_CHARS}{" "}
-                min · included in request when over minimum
-              </p>
-            </div>
-          </div>
-        ) : null}
 
         <div className="rounded-xl border border-line bg-surface p-4">
           <h2 className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-muted">

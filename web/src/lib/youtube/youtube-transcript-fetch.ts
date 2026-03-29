@@ -44,5 +44,9 @@ export function youtubeLikeFetch(
   return fetch(input, { ...init, headers });
 }
 
-/** Pass into every `fetchTranscript(..., { fetch })` call. */
+/**
+ * No `lang` — library uses the **first caption track** (`languageCode` exact match
+ * is skipped). Passing `lang: "en"` breaks when YouTube only lists `en-US` or similar.
+ * Add `lang` only in targeted fallbacks (e.g. `tr`).
+ */
 export const transcriptFetchOpts = { fetch: youtubeLikeFetch } as const;
