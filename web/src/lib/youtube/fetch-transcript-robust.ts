@@ -37,8 +37,9 @@ function errBrief(e: unknown): string {
 
 function getInnertube(): Promise<Innertube> {
   if (!innertubePromise) {
+    /** Default Node `fetch` only — do not pass `youtubeLikeFetch` here; it could break
+     *  non-`/player` InnerTube calls when UA was narrowed to 3 paths (regression vs early app). */
     innertubePromise = Innertube.create({
-      fetch: youtubeLikeFetch,
       lang: "en",
       location: "US",
     });

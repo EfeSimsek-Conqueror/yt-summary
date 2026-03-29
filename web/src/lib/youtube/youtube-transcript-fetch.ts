@@ -3,11 +3,19 @@
  * HTML without `captionTracks` for that fingerprint (looks like a bot). Railway etc.
  * already use datacenter IPs — a modern browser UA + referer helps.
  *
- * InnerTube `POST /youtubei/v1/player` must keep the library's Android client headers;
- * we do not override those.
+ * Any request to YouTube InnerTube (`/youtubei/...`, including `youtubei.googleapis.com`)
+ * must keep the User-Agent / headers that `youtubei.js` sets — never override them.
  */
 const DESKTOP_CHROME_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+function isYoutubeInnerTubeRequest(url: string): boolean {
+  return (
+    url.includes("/youtubei/") ||
+    url.includes("youtubei.googleapis.com") ||
+    url.includes("sandbox.googleapis.com/youtubei")
+  );
+}
 
 export function youtubeLikeFetch(
   input: RequestInfo | URL,
@@ -21,10 +29,7 @@ export function youtubeLikeFetch(
         : (input as Request).url;
 
   const headers = new Headers(init?.headers);
-  const isInnerTube =
-    url.includes("/youtubei/v1/player") ||
-    url.includes("/youtubei/v1/next") ||
-    url.includes("/youtubei/v1/get_transcript");
+  const isInnerTube = isYoutubeInnerTubeRequest(url);
 
   if (!isInnerTube) {
     headers.set("User-Agent", DESKTOP_CHROME_UA);
