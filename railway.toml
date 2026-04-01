@@ -1,12 +1,13 @@
-# Monorepo: Next.js in `web/`. Use NIXPACKS + root `nixpacks.toml` so Railway does not rely on Railpack auto-detect.
-# Alternative: Service → Root Directory = `web` (then `web/railway.toml` applies).
+# Monorepo: Next.js in `web/`. DOCKERFILE avoids Railpack (which fails if Root Directory is wrong).
+# Service → Root Directory: leave empty so repo root contains this file + `web/`.
 
 [build]
-builder = "NIXPACKS"
-nixpacksConfigPath = "nixpacks.toml"
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
 
 [deploy]
+# Must match image: start from repo root so `npm run start` → `web` (see root package.json).
 startCommand = "npm run start"
-healthcheckPath = "/"
+healthcheckPath = "/api/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
