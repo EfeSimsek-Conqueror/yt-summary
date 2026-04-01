@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { LandingSong } from "@/data/landing-coverflow-songs";
+import {
+  DEFAULT_PREVIEW_START_SEC,
+  youtubeCoverUrl,
+  type LandingSong,
+} from "@/data/landing-coverflow-songs";
 import { CoverFlow } from "./cover-flow";
 import { LandingBackgroundVideo } from "./landing-background-video";
 import { LandingPlayer } from "./landing-player";
@@ -17,7 +21,11 @@ export function LandingCoverflowHero({ songs }: Props) {
   );
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const getCover = useCallback((song: LandingSong) => song.albumCover || null, []);
+  const getCover = useCallback(
+    (song: LandingSong) =>
+      song.albumCover?.trim() || youtubeCoverUrl(song.youtubeId),
+    [],
+  );
   const isLoadingCover = useCallback(() => false, []);
 
   useEffect(() => {
@@ -49,6 +57,9 @@ export function LandingCoverflowHero({ songs }: Props) {
     handleSongSelect(songs[idx + 1]);
   };
 
+  const previewStartSec =
+    selectedSong?.previewStartSec ?? DEFAULT_PREVIEW_START_SEC;
+
   return (
     <section
       className="relative isolate flex min-h-[100dvh] w-full flex-col overflow-x-hidden border-b border-white/5 bg-black"
@@ -57,6 +68,7 @@ export function LandingCoverflowHero({ songs }: Props) {
       {selectedSong && (
         <LandingBackgroundVideo
           youtubeId={selectedSong.youtubeId}
+          startSeconds={previewStartSec}
           isPlaying={isPlaying}
           layout="fullscreen"
         />
@@ -102,8 +114,9 @@ export function LandingCoverflowHero({ songs }: Props) {
                   </p>
                 )}
                 <LandingPlayer
-                  key={selectedSong.youtubeId}
+                  key={selectedSong.id}
                   youtubeId={selectedSong.youtubeId}
+                  startSeconds={previewStartSec}
                   onPlayingChange={setIsPlaying}
                   canGoPrev={
                     songs.findIndex((s) => s.id === selectedSong.id) > 0

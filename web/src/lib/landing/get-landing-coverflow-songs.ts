@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import {
+  DEFAULT_PREVIEW_START_SEC,
   FALLBACK_LANDING_COVERFLOW_SONGS,
   youtubeCoverUrl,
   type LandingSong,
@@ -22,27 +23,39 @@ const FALLBACK_BY_ID = new Map(
 
 /** Legacy DB typos — map to working IDs when a row has no bundled fallback entry. */
 function normalizeYoutubeId(youtubeId: string): string {
-  if (youtubeId === "b1kbLWvqugk") return "b1kbLwvqugk";
-  return youtubeId;
+  const t = youtubeId.trim();
+  if (!t) return t;
+  if (t === "b1kbLWvqugk") return "b1kbLwvqugk";
+  /** Old Jagger id — hqdefault 404; official video is iEPTlhBmwRg */
+  if (t === "sEhJf6OlqIw") return "iEPTlhBmwRg";
+  return t;
 }
 
 function rowToSong(row: Row): LandingSong {
-  const fb = FALLBACK_BY_ID.get(row.id);
-  /** Curated list in code is source of truth for playback IDs (avoids stale Supabase typos). */
-  const ytId = fb?.youtubeId ?? normalizeYoutubeId(row.youtube_id);
+  const idKey = String(row.id).trim();
+  const fb = FALLBACK_BY_ID.get(idKey);
+  const ytFromDb = normalizeYoutubeId(String(row.youtube_id ?? ""));
+  /** Bundled row wins for playback id when present (DB often lags behind shipped fixes). */
+  const youtubeId = fb?.youtubeId ?? ytFromDb;
+
   const raw = row.cover_url?.trim() || "";
-  const isYtThumb = raw.includes("ytimg.com");
-  const albumCover = isYtThumb
-    ? (fb?.albumCover ?? youtubeCoverUrl(ytId))
-    : raw || fb?.albumCover || youtubeCoverUrl(ytId);
+  /**
+   * Prefer bundled `albumCover` before DB `cover_url`.
+   * Otherwise a stale mzstatic / wrong thumb in Supabase overrides the fix after code changes.
+   */
+  const merged =
+    fb?.albumCover?.trim() || raw || youtubeCoverUrl(youtubeId);
+  const albumCover = merged.trim() || youtubeCoverUrl(youtubeId);
   return {
-    id: row.id,
+    id: idKey,
     title: row.title,
     artist: row.artist,
-    youtubeId: ytId,
+    youtubeId,
     albumName: row.album_name ?? undefined,
     year: row.year ?? undefined,
     albumCover,
+    previewStartSec:
+      fb?.previewStartSec ?? DEFAULT_PREVIEW_START_SEC,
   };
 }
 

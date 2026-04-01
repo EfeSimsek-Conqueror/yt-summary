@@ -364,6 +364,14 @@ export function CoverFlow({
                     draggable={false}
                     className="h-full w-full min-h-full min-w-full scale-[1.08] select-none object-cover object-center brightness-[1.02] contrast-[1.03] saturate-[1.08]"
                     style={{ userSelect: "none" }}
+                    onError={(e) => {
+                      const el = e.currentTarget;
+                      const s = el.src;
+                      if (s.includes("/hqdefault"))
+                        el.src = s.replace("/hqdefault", "/mqdefault");
+                      else if (s.includes("/mqdefault"))
+                        el.src = s.replace("/mqdefault", "/sddefault");
+                    }}
                   />
                   <div
                     className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-t from-black/45 via-transparent to-white/[0.07]"

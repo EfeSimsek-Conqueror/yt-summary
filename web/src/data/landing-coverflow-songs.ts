@@ -7,7 +7,15 @@ export type LandingSong = {
   youtubeId: string;
   albumName?: string;
   year?: number;
+  /**
+   * Where preview playback begins (seconds) — chorus / drop, not the intro.
+   * Omit to use {@link DEFAULT_PREVIEW_START_SEC}.
+   */
+  previewStartSec?: number;
 };
+
+/** Fallback when a track has no curated hype timestamp. */
+export const DEFAULT_PREVIEW_START_SEC = 48;
 
 /** YouTube thumbnail fallback when no curated cover is available. */
 export function youtubeCoverUrl(youtubeId: string): string {
@@ -24,6 +32,7 @@ export const FALLBACK_LANDING_COVERFLOW_SONGS: LandingSong[] = [
     title: "Shake It Off",
     artist: "Taylor Swift",
     youtubeId: "nfWlot6h_JM",
+    previewStartSec: 45,
     albumName: "1989 (Deluxe Edition)",
     year: 2014,
     albumCover:
@@ -34,6 +43,7 @@ export const FALLBACK_LANDING_COVERFLOW_SONGS: LandingSong[] = [
     title: "Flowers",
     artist: "Miley Cyrus",
     youtubeId: "G7KNmW9a75Y",
+    previewStartSec: 42,
     albumName: "Endless Summer Vacation",
     year: 2023,
     albumCover:
@@ -44,6 +54,7 @@ export const FALLBACK_LANDING_COVERFLOW_SONGS: LandingSong[] = [
     title: "Unholy",
     artist: "Sam Smith",
     youtubeId: "Uq9gPaIzbe8",
+    previewStartSec: 55,
     albumName: "Gloria",
     year: 2023,
     albumCover:
@@ -54,6 +65,7 @@ export const FALLBACK_LANDING_COVERFLOW_SONGS: LandingSong[] = [
     title: "As It Was",
     artist: "Harry Styles",
     youtubeId: "H5v3kku4y6Q",
+    previewStartSec: 47,
     albumName: "Harry's House",
     year: 2022,
     albumCover:
@@ -64,6 +76,7 @@ export const FALLBACK_LANDING_COVERFLOW_SONGS: LandingSong[] = [
     title: "Heat Waves",
     artist: "Glass Animals",
     youtubeId: "mRD0-GxqHVo",
+    previewStartSec: 52,
     albumName: "Dreamland",
     year: 2020,
     albumCover:
@@ -74,6 +87,7 @@ export const FALLBACK_LANDING_COVERFLOW_SONGS: LandingSong[] = [
     title: "Stay",
     artist: "The Kid LAROI",
     youtubeId: "kTJczUoc26U",
+    previewStartSec: 44,
     albumName: "F*CK LOVE 3: OVER YOU",
     year: 2021,
     albumCover:
@@ -84,6 +98,7 @@ export const FALLBACK_LANDING_COVERFLOW_SONGS: LandingSong[] = [
     title: "Industry Baby",
     artist: "Lil Nas X",
     youtubeId: "UTHLKHL_whs",
+    previewStartSec: 38,
     albumName: "MONTERO",
     year: 2021,
     albumCover:
@@ -94,6 +109,7 @@ export const FALLBACK_LANDING_COVERFLOW_SONGS: LandingSong[] = [
     title: "Positions",
     artist: "Ariana Grande",
     youtubeId: "tcYodQoapMg",
+    previewStartSec: 45,
     albumName: "Positions",
     year: 2020,
     albumCover:
@@ -104,6 +120,7 @@ export const FALLBACK_LANDING_COVERFLOW_SONGS: LandingSong[] = [
     title: "Good 4 U",
     artist: "Olivia Rodrigo",
     youtubeId: "gNi_6U5Pm_o",
+    previewStartSec: 41,
     albumName: "SOUR",
     year: 2021,
     albumCover:
@@ -114,6 +131,7 @@ export const FALLBACK_LANDING_COVERFLOW_SONGS: LandingSong[] = [
     title: "Levitating",
     artist: "Dua Lipa",
     youtubeId: "TUVcZfQe-Kw",
+    previewStartSec: 46,
     albumName: "Future Nostalgia",
     year: 2020,
     albumCover:
@@ -124,6 +142,7 @@ export const FALLBACK_LANDING_COVERFLOW_SONGS: LandingSong[] = [
     title: "Blinding Lights",
     artist: "The Weeknd",
     youtubeId: "4NRXx6U8ABQ",
+    previewStartSec: 50,
     albumName: "After Hours",
     year: 2020,
     albumCover:
@@ -131,19 +150,23 @@ export const FALLBACK_LANDING_COVERFLOW_SONGS: LandingSong[] = [
   },
   {
     id: "19",
-    title: "Physical",
-    artist: "Dua Lipa",
-    youtubeId: "9HDEHj2yzew",
-    albumName: "Future Nostalgia",
-    year: 2020,
+    title: "Moves Like Jagger",
+    artist: "Maroon 5 ft. Christina Aguilera",
+    /** Official VEVO upload — `sEhJf6OlqIw` thumbnails 404 on i.ytimg.com. */
+    youtubeId: "iEPTlhBmwRg",
+    /** ~first chorus / “Moves like Jagger” hook (after intro + whistle). */
+    previewStartSec: 55,
+    albumName: "Hands All Over",
+    year: 2011,
     albumCover:
-      "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/6c/11/d6/6c11d681-aa3a-d59e-4c2e-f77e181026ab/190295092665.jpg/600x600bb.jpg",
+      "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/5f/6e/4c/5f6e4c8b-eba6-f722-caf4-c5773dea7fa1/14UMGIM27067.rgb.jpg/600x600bb.jpg",
   },
   {
     id: "20",
     title: "Shivers",
     artist: "Ed Sheeran",
     youtubeId: "Il0S8BoucSA",
+    previewStartSec: 45,
     albumName: "=",
     year: 2021,
     albumCover:
@@ -154,6 +177,7 @@ export const FALLBACK_LANDING_COVERFLOW_SONGS: LandingSong[] = [
     title: "Uptown Funk",
     artist: "Mark Ronson ft. Bruno Mars",
     youtubeId: "OPf0YbXqDm0",
+    previewStartSec: 36,
     albumName: "Uptown Special",
     year: 2014,
     albumCover:
@@ -164,6 +188,7 @@ export const FALLBACK_LANDING_COVERFLOW_SONGS: LandingSong[] = [
     title: "Dynamite",
     artist: "BTS",
     youtubeId: "gdZLi9oWNZg",
+    previewStartSec: 52,
     albumName: "BE",
     year: 2020,
     albumCover:

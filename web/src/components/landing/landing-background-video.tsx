@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 
 type Props = {
   youtubeId: string;
+  /** Seconds — align with landing audio preview (chorus / drop). */
+  startSeconds?: number;
   isPlaying: boolean;
   /**
    * Full browser viewport behind the hero (default). Use `inline` only for a small card-sized preview.
@@ -14,6 +16,7 @@ type Props = {
 /** Blurred, muted YouTube embed for atmosphere. Fullscreen covers the whole viewport when playing. */
 export function LandingBackgroundVideo({
   youtubeId,
+  startSeconds = 0,
   isPlaying,
   layout = "fullscreen",
 }: Props) {
@@ -25,7 +28,7 @@ export function LandingBackgroundVideo({
     setHasError(false);
     setRetryCount(0);
     setIsLoading(true);
-  }, [youtubeId]);
+  }, [youtubeId, startSeconds]);
 
   if (!isPlaying) return null;
 
@@ -38,8 +41,8 @@ export function LandingBackgroundVideo({
     <div className={shell} aria-hidden>
       {!hasError ? (
         <iframe
-          key={`bg-${youtubeId}-${retryCount}`}
-          src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&modestbranding=1&loop=1&playlist=${youtubeId}&iv_load_policy=3&fs=0&cc_load_policy=0&playsinline=1&disablekb=1&start=0&enablejsapi=1`}
+          key={`bg-${youtubeId}-${startSeconds}-${retryCount}`}
+          src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&modestbranding=1&loop=1&playlist=${youtubeId}&iv_load_policy=3&fs=0&cc_load_policy=0&playsinline=1&disablekb=1&start=${startSeconds}&enablejsapi=1`}
           title="Background"
           className="border-0 outline-none"
           onError={() => {

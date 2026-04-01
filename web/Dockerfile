@@ -11,7 +11,5 @@ COPY . .
 ENV NODE_ENV=production
 RUN npm run build
 
-ENV PORT=3000
-EXPOSE 3000
-
+# PORT comes from Railway at runtime (e.g. 8080). Do not bake a fixed PORT into the image.
 CMD ["npm", "run", "start"]

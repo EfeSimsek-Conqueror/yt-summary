@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { DEFAULT_PREVIEW_START_SEC } from "@/data/landing-coverflow-songs";
 import { loadYoutubeIframeApi } from "@/lib/landing/youtube-iframe-api";
 
 type Props = {
   youtubeId: string;
+  /** Start here (seconds) when user plays — chorus / drop, not intro. */
+  startSeconds?: number;
   onPlayingChange?: (playing: boolean) => void;
   canGoPrev?: boolean;
   canGoNext?: boolean;
@@ -19,6 +22,7 @@ type Props = {
  */
 export function LandingPlayer({
   youtubeId,
+  startSeconds = DEFAULT_PREVIEW_START_SEC,
   onPlayingChange,
   canGoPrev = false,
   canGoNext = false,
@@ -31,11 +35,15 @@ export function LandingPlayer({
     destroy?: () => void;
     playVideo?: () => void;
     pauseVideo?: () => void;
+    seekTo?: (seconds: number, allowSeekAhead: boolean) => void;
+    getCurrentTime?: () => number;
   } | null>(null);
   const onPlayingChangeRef = useRef(onPlayingChange);
   onPlayingChangeRef.current = onPlayingChange;
   /** Only accept PLAYING state after the user taps play (blocks stray YouTube autoplay). */
   const userStartedPlaybackRef = useRef(false);
+  const startSecondsRef = useRef(startSeconds);
+  startSecondsRef.current = startSeconds;
 
   useEffect(() => {
     userStartedPlaybackRef.current = false;
@@ -51,6 +59,13 @@ export function LandingPlayer({
     (async () => {
       await loadYoutubeIframeApi();
       if (cancelled) return;
+      type YtTarget = {
+        cueVideoById?: (id: string, startSec?: number) => void;
+        seekTo?: (s: number, allowSeekAhead: boolean) => void;
+        pauseVideo?: () => void;
+        playVideo?: () => void;
+        getCurrentTime?: () => number;
+      };
       const YT = (
         window as unknown as {
           YT: {
@@ -62,8 +77,8 @@ export function LandingPlayer({
                 videoId: string;
                 playerVars: Record<string, string | number>;
                 events: {
-                  onReady: () => void;
-                  onStateChange: (event: { data: number }) => void;
+                  onReady: (event: { target: YtTarget }) => void;
+                  onStateChange: (event: { data: number; target: YtTarget }) => void;
                   onError?: (event: { data: number }) => void;
                 };
               },
@@ -71,29 +86,47 @@ export function LandingPlayer({
               destroy?: () => void;
               playVideo?: () => void;
               pauseVideo?: () => void;
+              seekTo?: (s: number, allowSeekAhead: boolean) => void;
             };
           };
         }
       ).YT;
       if (!YT?.Player || cancelled) return;
+      /** Omit `start` here — use cueVideoById in onReady (playerVars.start is flaky). */
+      const playerVars: Record<string, string | number> = {
+        autoplay: 0,
+        controls: 0,
+        disablekb: 1,
+        fs: 0,
+        modestbranding: 1,
+        rel: 0,
+        iv_load_policy: 3,
+        cc_load_policy: 0,
+        playsinline: 1,
+      };
+      if (typeof window !== "undefined") {
+        playerVars.origin = window.location.origin;
+      }
       playerRef.current = new YT.Player(mount, {
-        height: "0",
-        width: "0",
+        /** Non-zero size: some browsers mute a 0×0 embed even after user gesture. */
+        height: "1",
+        width: "1",
         videoId: youtubeId,
-        playerVars: {
-          autoplay: 0,
-          controls: 0,
-          disablekb: 1,
-          fs: 0,
-          modestbranding: 1,
-          rel: 0,
-          iv_load_policy: 3,
-          cc_load_policy: 0,
-          playsinline: 1,
-        },
+        playerVars,
         events: {
-          onReady: () => {
+          onReady: (event) => {
             if (cancelled) return;
+            const t = event.target;
+            const t0 = startSecondsRef.current;
+            try {
+              if (typeof t.cueVideoById === "function") {
+                t.cueVideoById(youtubeId, t0);
+              } else {
+                t.seekTo?.(t0, true);
+              }
+            } catch {
+              /* ignore */
+            }
             setIsReady(true);
             queueMicrotask(() => {
               try {
@@ -103,8 +136,20 @@ export function LandingPlayer({
               }
             });
           },
-          onStateChange: (event: { data: number }) => {
+          onStateChange: (event) => {
             const playing = event.data === 1;
+            const t = event.target;
+            const t0 = startSecondsRef.current;
+            if (playing && userStartedPlaybackRef.current) {
+              try {
+                const cur = t.getCurrentTime?.() ?? 0;
+                if (cur < t0 - 0.75) {
+                  t.seekTo?.(t0, true);
+                }
+              } catch {
+                /* ignore */
+              }
+            }
             if (playing && !userStartedPlaybackRef.current) {
               try {
                 playerRef.current?.pauseVideo?.();
@@ -137,7 +182,7 @@ export function LandingPlayer({
       }
       mount.remove();
     };
-  }, [youtubeId]);
+  }, [youtubeId, startSeconds]);
 
   const handleTogglePlay = () => {
     if (!isReady || !playerRef.current) return;
@@ -146,7 +191,20 @@ export function LandingPlayer({
         playerRef.current.pauseVideo?.();
       } else {
         userStartedPlaybackRef.current = true;
-        playerRef.current.playVideo?.();
+        const t0 = startSecondsRef.current;
+        try {
+          playerRef.current.seekTo?.(t0, true);
+        } catch {
+          /* ignore */
+        }
+        requestAnimationFrame(() => {
+          try {
+            playerRef.current?.seekTo?.(t0, true);
+            playerRef.current?.playVideo?.();
+          } catch {
+            /* ignore */
+          }
+        });
       }
     } catch {
       /* ignore */
