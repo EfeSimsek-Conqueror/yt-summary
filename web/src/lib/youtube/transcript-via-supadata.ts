@@ -1,3 +1,4 @@
+import { env as nodeEnv } from "node:process";
 import type { TranscriptResponse } from "youtube-transcript";
 import {
   YoutubeTranscriptNotAvailableError,
@@ -16,15 +17,15 @@ function delay(ms: number): Promise<void> {
 }
 
 /**
- * Runtime-only read. Key name is built dynamically so Next/Webpack cannot replace
- * `process.env.SUPADATA_API_KEY` with `undefined` at build time when the var exists
- * only on Railway at runtime.
+ * Runtime-only read via `node:process` env object — avoids Webpack/Next DefinePlugin
+ * baking `undefined` for server secrets that exist only on Railway at runtime.
+ * Optional alias: SUPADATA_KEY (some dashboards use shorter names).
  */
 const SUPADATA_KEY_NAME = ["SUPADATA", "API", "KEY"].join("_");
+const ALT_KEY_NAME = ["SUPADATA", "KEY"].join("_");
 
 export function getSupadataApiKey(): string | undefined {
-  if (typeof process === "undefined") return undefined;
-  const raw = process.env[SUPADATA_KEY_NAME];
+  const raw = nodeEnv[SUPADATA_KEY_NAME] ?? nodeEnv[ALT_KEY_NAME];
   const k = typeof raw === "string" ? raw.trim() : "";
   return k || undefined;
 }
