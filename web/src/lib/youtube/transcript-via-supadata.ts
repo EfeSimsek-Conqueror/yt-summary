@@ -15,10 +15,16 @@ function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/** Runtime read (avoid build-time env inlining missing Railway-only secrets). */
+/**
+ * Runtime-only read. Key name is built dynamically so Next/Webpack cannot replace
+ * `process.env.SUPADATA_API_KEY` with `undefined` at build time when the var exists
+ * only on Railway at runtime.
+ */
+const SUPADATA_KEY_NAME = ["SUPADATA", "API", "KEY"].join("_");
+
 export function getSupadataApiKey(): string | undefined {
-  const raw =
-    process.env.SUPADATA_API_KEY ?? process.env["SUPADATA_API_KEY"];
+  if (typeof process === "undefined") return undefined;
+  const raw = process.env[SUPADATA_KEY_NAME];
   const k = typeof raw === "string" ? raw.trim() : "";
   return k || undefined;
 }

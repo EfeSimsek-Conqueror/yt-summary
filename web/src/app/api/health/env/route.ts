@@ -1,6 +1,7 @@
 import { getSupadataApiKey } from "@/lib/youtube/transcript-via-supadata";
 import { NextResponse } from "next/server";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**

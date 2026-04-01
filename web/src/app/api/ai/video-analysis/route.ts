@@ -19,6 +19,9 @@ import {
   YoutubeTranscriptVideoUnavailableError,
 } from "youtube-transcript";
 
+/** Node runtime: full `process.env` (Supadata, FAL). Edge would omit server secrets. */
+export const runtime = "nodejs";
+
 /** Transcript via Supadata + analysis LLM call. */
 export const maxDuration = 900;
 
