@@ -4,8 +4,12 @@ import { VideoDetail } from "@/components/video-detail";
 import { getChannelsForUser } from "@/lib/channels-for-user";
 import { createClient } from "@/lib/supabase/server";
 import { getVideo } from "@/lib/mock-data";
-import { fetchVideoById } from "@/lib/youtube/fetch-video-by-id";
+import {
+  fetchVideoById,
+  fetchVideoByIdWithApiKey,
+} from "@/lib/youtube/fetch-video-by-id";
 import { isLikelyYoutubeVideoId } from "@/lib/youtube/video-id";
+import type { Video } from "@/lib/types";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -41,16 +45,25 @@ export default async function VideoPage({ params }: Props) {
     data: { session },
   } = await supabase.auth.getSession();
 
-  if (!session?.provider_token) {
-    notFound();
+  let video: Video | undefined;
+
+  if (session?.provider_token) {
+    const fetched = await fetchVideoById(session.provider_token, id);
+    if (fetched.ok) {
+      video = fetched.video;
+    }
   }
 
-  const fetched = await fetchVideoById(session.provider_token, id);
-  if (!fetched.ok) {
-    notFound();
+  if (!video) {
+    const fetched = await fetchVideoByIdWithApiKey(id);
+    if (fetched.ok) {
+      video = fetched.video;
+    }
   }
 
-  const video = fetched.video;
+  if (!video) {
+    notFound();
+  }
 
   return (
     <AppShell
@@ -60,7 +73,7 @@ export default async function VideoPage({ params }: Props) {
           ? video.channelId
           : channels[0]?.id ?? video.channelId
       }
-      isAuthenticated
+      isAuthenticated={!!user}
       subscriptionSidebar={false}
     >
       <VideoDetail video={video} />

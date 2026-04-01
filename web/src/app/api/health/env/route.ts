@@ -5,11 +5,20 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * No secrets returned — only whether server env sees Supadata. Use after setting
- * Railway variables to confirm the running deployment picked them up (redeploy if false).
+ * No secret values — only whether Supadata is visible to this Node process.
+ * `supadataKeyLength` > 0 means a non-empty key string (length only, safe).
+ * `envKeyNamesWithSupadata` lists matching env *names* (typos like `SUPADATA_API_KEY `).
  */
 export async function GET() {
+  const key = readSupadataApiKey();
+  const env = globalThis.process?.env ?? {};
+  const envKeyNamesWithSupadata = Object.keys(env).filter((k) =>
+    k.toUpperCase().includes("SUPADATA"),
+  );
+
   return NextResponse.json({
-    supadataConfigured: Boolean(readSupadataApiKey()),
+    supadataConfigured: Boolean(key),
+    supadataKeyLength: key?.length ?? 0,
+    envKeyNamesWithSupadata,
   });
 }

@@ -2,12 +2,14 @@
 
 import { signInWithGoogle } from "@/lib/auth/google-oauth";
 import { ConnectYoutubeCta } from "@/components/connect-youtube-cta";
+import { useGuestGate } from "@/components/guest-gate-context";
 import { UserProfileMenu } from "@/components/user-profile-menu";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
 
 export function AuthControls() {
+  const guestGate = useGuestGate();
   const [user, setUser] = useState<User | null | "pending">("pending");
   /** Google OAuth access token for YouTube Data API — missing on email-only sign-in. */
   const [hasYoutubeToken, setHasYoutubeToken] = useState<boolean | "pending">(
@@ -56,14 +58,22 @@ export function AuthControls() {
   }
 
   if (!user) {
+    const next = `${window.location.pathname}${window.location.search}`;
+    if (guestGate) {
+      return (
+        <button
+          type="button"
+          onClick={() => void signInWithGoogle(next).catch(() => {})}
+          className="text-xs font-medium text-gray-400 underline-offset-4 transition hover:text-white hover:underline"
+        >
+          Sign in
+        </button>
+      );
+    }
     return (
       <button
         type="button"
-        onClick={() =>
-          void signInWithGoogle(
-            `${window.location.pathname}${window.location.search}`,
-          ).catch(() => {})
-        }
+        onClick={() => void signInWithGoogle(next).catch(() => {})}
         className="rounded-lg border border-gray-700 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-zinc-800"
       >
         Sign in with Google

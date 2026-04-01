@@ -1,4 +1,5 @@
 import { ConnectYoutubeCta } from "@/components/connect-youtube-cta";
+import { Youtube } from "lucide-react";
 
 type Props = {
   needsYoutubeScope?: boolean;
@@ -23,29 +24,48 @@ export function YoutubeSyncHint({
 
   if (needsYoutubeScope) {
     return (
-      <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-xs text-amber-100/90">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-          <p className="min-w-0 leading-relaxed">
-            <strong className="font-semibold">YouTube isn’t connected yet.</strong>{" "}
+      <div
+        className="mb-8 rounded-2xl border border-gray-800 bg-gradient-to-b from-zinc-900/95 to-zinc-950/95 px-6 py-8 shadow-xl ring-1 ring-white/[0.06] sm:px-10 sm:py-10"
+        role="region"
+        aria-labelledby="yt-connect-title"
+      >
+        <div className="mx-auto flex max-w-lg flex-col items-center text-center">
+          <div
+            className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-red-500 to-red-700 shadow-lg shadow-red-500/30"
+            aria-hidden
+          >
+            <Youtube className="h-6 w-6 text-white" />
+          </div>
+          <h2
+            id="yt-connect-title"
+            className="mt-5 text-xl font-semibold tracking-tight text-white"
+          >
+            Connect YouTube
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-gray-400">
             {isSignedIn ? (
               <>
-                You’re signed in to VidSum, but we still need a Google access token
-                with YouTube scope. Tap{" "}
-                <strong>Connect Google for YouTube</strong> (or sign out and use
-                &quot;Sign in with Google&quot; once) so we can call YouTube Data API
-                v3 with{" "}
-                <code className="rounded bg-black/30 px-1">youtube.readonly</code>.
+                You&apos;re signed in to VidSum. Link Google with YouTube access
+                so we can call YouTube Data API with{" "}
+                <code className="rounded bg-black/40 px-1 py-0.5 text-[0.8rem] text-gray-300">
+                  youtube.readonly
+                </code>{" "}
+                — same scopes as a fresh &quot;Sign in with Google&quot; from
+                the header.
               </>
             ) : (
               <>
-                Signing in with email doesn’t give a Google access token. Use{" "}
-                <strong>Connect Google for YouTube</strong> (or sign out and &quot;Sign
-                in with Google&quot;) so we can call YouTube Data API v3 with{" "}
-                <code className="rounded bg-black/30 px-1">youtube.readonly</code>.
+                Email sign-in doesn&apos;t include a Google access token. Use
+                the button below (or sign out and use &quot;Sign in with
+                Google&quot;) so we can call YouTube Data API with{" "}
+                <code className="rounded bg-black/40 px-1 py-0.5 text-[0.8rem] text-gray-300">
+                  youtube.readonly
+                </code>
+                .
               </>
             )}
           </p>
-          <ConnectYoutubeCta className="shrink-0" />
+          <ConnectYoutubeCta className="mt-6 w-full max-w-sm py-3 text-sm font-semibold shadow-lg shadow-blue-500/15" />
         </div>
       </div>
     );

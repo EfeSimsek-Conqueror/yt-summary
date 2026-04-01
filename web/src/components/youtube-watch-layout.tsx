@@ -175,6 +175,8 @@ function mapApiSegments(rows: ApiSegment[]): Segment[] {
 
 export function YoutubeWatchLayout({ video, channelLabel }: Props) {
   const playerRef = useRef<YT.Player | null>(null);
+  /** YouTube watch URLs run server-side analysis; start in “pending” so the segment panel never flashes empty copy before the first effect. */
+  const canEmbed = isLikelyYoutubeVideoId(video.id);
   /** loading = waiting for API or onReady; ready = can seek; error/timeout = embed failed or stuck */
   const [playerPhase, setPlayerPhase] = useState<
     "loading" | "ready" | "error" | "timeout"
@@ -182,7 +184,7 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
   const playerReady = playerPhase === "ready";
   const [playhead, setPlayhead] = useState(0);
   const [analysis, setAnalysis] = useState<AnalysisPayload | null>(null);
-  const [analysisBusy, setAnalysisBusy] = useState(false);
+  const [analysisBusy, setAnalysisBusy] = useState(() => canEmbed);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [spoilersRevealed, setSpoilersRevealed] = useState(false);
   /** Bumps to destroy/recreate the YT.Player (e.g. after timeout). */
@@ -211,8 +213,6 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
   /** True after ~22s so we don't pretend we're stuck at one fake %. */
   const [analysisProgressSlow, setAnalysisProgressSlow] = useState(false);
   /** Optional pasted transcript when YouTube won’t serve captions to the server (API: transcriptPlain, min 400 chars). */
-
-  const canEmbed = isLikelyYoutubeVideoId(video.id);
 
   useEffect(() => {
     const sync = () => {
@@ -255,7 +255,8 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
     analysisRunGenRef.current = 0;
     setAnalysis(null);
     setAnalysisError(null);
-    setAnalysisBusy(false);
+    /** Pending analysis for embeddable videos — avoids “No segments yet” while the next run is scheduled. */
+    setAnalysisBusy(canEmbed);
     setSpoilersRevealed(false);
     setPlayerRetryKey(0);
     setEmbedFallback(false);
@@ -266,7 +267,7 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
     if (typeof document !== "undefined" && document.fullscreenElement) {
       void document.exitFullscreen().catch(() => {});
     }
-  }, [video.id]);
+  }, [video.id, canEmbed]);
 
   /** Prefer AI analysis segments; while analysis is running, ignore mock `video.segments` so the loading bar shows. */
   const analysisSegments = analysis?.segments;
@@ -666,7 +667,9 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
               <p className="text-sm text-muted">
                 {analysisError
                   ? segmentAnalysisBlockedReason(analysisError)
-                  : "No segments yet. Run analysis (FAL_KEY required; captions from YouTube, then summary)."}
+                  : canEmbed
+                    ? "Segments will appear here when analysis finishes (captions → summary via Fal). If this stays empty, check FAL_KEY and retry."
+                    : "No segments for this catalog video."}
               </p>
             ) : (
               <ul className="space-y-2">

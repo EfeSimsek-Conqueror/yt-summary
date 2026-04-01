@@ -26,7 +26,11 @@ export function VideoDetail({ video }: Props) {
         ← Back to channel
       </Link>
 
-      <YoutubeWatchLayout video={video} channelLabel={channelLabel} />
+      <YoutubeWatchLayout
+        key={video.id}
+        video={video}
+        channelLabel={channelLabel}
+      />
     </main>
   );
 }

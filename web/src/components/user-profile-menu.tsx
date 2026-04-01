@@ -8,9 +8,53 @@ import {
   LogOut,
   Settings,
 } from "lucide-react";
-import Image from "next/image";
+import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+
+const GOOGLE_USERINFO = "https://www.googleapis.com/oauth2/v3/userinfo";
+
+async function fetchPictureWithProviderToken(
+  signal: AbortSignal,
+): Promise<string | null> {
+  const supabase = createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const token = session?.provider_token;
+  if (!token) return null;
+  try {
+    const r = await fetch(GOOGLE_USERINFO, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal,
+    });
+    if (!r.ok) return null;
+    const j = (await r.json()) as { picture?: string };
+    return typeof j.picture === "string" && j.picture.trim().length > 0
+      ? j.picture.trim()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchPictureViaApiRoute(
+  signal: AbortSignal,
+): Promise<string | null> {
+  try {
+    const res = await fetch("/api/auth/google-picture", {
+      credentials: "include",
+      signal,
+    });
+    if (!res.ok) return null;
+    const j = (await res.json()) as { picture: string | null };
+    return typeof j.picture === "string" && j.picture.trim().length > 0
+      ? j.picture.trim()
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 type Props = {
   user: User;
@@ -38,19 +82,93 @@ function getInitials(user: User): string {
   return e.slice(0, 2).toUpperCase();
 }
 
+/** Last resort: any metadata URL that looks like a Google / profile image. */
+function scanMetadataForProfileImage(
+  obj: Record<string, unknown> | null | undefined,
+): string | null {
+  if (!obj || typeof obj !== "object") return null;
+  for (const [key, val] of Object.entries(obj)) {
+    if (typeof val !== "string" || val.length < 12) continue;
+    const v = val.trim();
+    if (!v.startsWith("http")) continue;
+    if (/picture|avatar|photo|image|thumb|profile/i.test(key)) return v;
+    if (v.includes("googleusercontent.com") || v.includes("ggpht.com")) return v;
+  }
+  return null;
+}
+
+/**
+ * Google OIDC puts the profile photo in `picture` (OpenID standard).
+ * Supabase may also copy it to `avatar_url`. Identity rows keep the same keys.
+ */
+function getAvatarUrl(user: User): string | null {
+  const m = user.user_metadata;
+  if (m && typeof m === "object") {
+    const rec = m as Record<string, unknown>;
+    const fromMeta = [rec.picture, rec.avatar_url];
+    for (const u of fromMeta) {
+      if (typeof u === "string" && u.trim().length > 0) return u.trim();
+    }
+    const scanned = scanMetadataForProfileImage(rec);
+    if (scanned) return scanned;
+  }
+  for (const id of user.identities ?? []) {
+    const d = id.identity_data;
+    if (!d || typeof d !== "object") continue;
+    const idRec = d as Record<string, unknown>;
+    const fromId = [idRec.picture, idRec.avatar_url];
+    for (const u of fromId) {
+      if (typeof u === "string" && u.trim().length > 0) return u.trim();
+    }
+    const scanned = scanMetadataForProfileImage(idRec);
+    if (scanned) return scanned;
+  }
+  return null;
+}
+
 function UserAvatar({ user, size = "md" }: { user: User; size?: "sm" | "md" }) {
-  const url = user.user_metadata?.avatar_url;
+  const metaUrl = getAvatarUrl(user);
+  const [googleApiUrl, setGoogleApiUrl] = useState<string | null>(null);
+  const url = metaUrl ?? googleApiUrl;
   const px = size === "sm" ? 32 : 36;
   const dim = size === "sm" ? "h-8 w-8 text-xs" : "h-9 w-9 text-sm";
-  if (typeof url === "string" && url.length > 0) {
+  const [imgFailed, setImgFailed] = useState(false);
+
+  useEffect(() => {
+    setImgFailed(false);
+  }, [url]);
+
+  /**
+   * If JWT omits `picture`, resolve it from Google userinfo. Prefer the browser
+   * session’s `provider_token` (often present only client-side); fall back to the
+   * API route when SSR/cookies don’t expose the token.
+   */
+  useEffect(() => {
+    setGoogleApiUrl(null);
+    if (metaUrl) return;
+    const ac = new AbortController();
+    (async () => {
+      let pic = await fetchPictureWithProviderToken(ac.signal);
+      if (!pic && !ac.signal.aborted) {
+        pic = await fetchPictureViaApiRoute(ac.signal);
+      }
+      if (pic && !ac.signal.aborted) setGoogleApiUrl(pic);
+    })();
+    return () => ac.abort();
+  }, [user.id, metaUrl]);
+
+  if (url && !imgFailed) {
+    // Native <img>: Google profile URLs use various *.googleusercontent.com hosts;
+    // avoids Next/Image remotePatterns missing a subdomain.
     return (
-      <Image
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
         src={url}
         alt=""
         width={px}
         height={px}
         className={`${dim} shrink-0 rounded-full object-cover ring-2 ring-gray-800`}
-        unoptimized
+        onError={() => setImgFailed(true)}
       />
     );
   }
