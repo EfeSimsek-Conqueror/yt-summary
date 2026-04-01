@@ -1,12 +1,43 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
+import { resolvePublicSiteUrl } from "@/lib/app-url";
+
+/**
+ * Public origin for redirects after OAuth. Do not use `new URL(request.url).origin`:
+ * behind Railway/proxies the URL can be `http://0.0.0.0:8080`, which sends users to a dead address.
+ */
+function getPublicOriginForRedirect(request: NextRequest): string {
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  const forwardedProtoRaw =
+    request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ?? "https";
+  const proto =
+    forwardedProtoRaw === "http" || forwardedProtoRaw === "https"
+      ? forwardedProtoRaw
+      : "https";
+
+  if (forwardedHost && forwardedHost !== "0.0.0.0") {
+    return `${proto}://${forwardedHost}`;
+  }
+
+  const host = request.headers.get("host")?.split(",")[0]?.trim();
+  if (host && !host.startsWith("0.0.0.0")) {
+    return `${proto}://${host}`;
+  }
+
+  const { hostname } = request.nextUrl;
+  if (hostname !== "0.0.0.0") {
+    return request.nextUrl.origin;
+  }
+
+  return resolvePublicSiteUrl();
+}
 
 /** Exchange Supabase OAuth `code` for session; redirect to `next` or error page. */
 export async function handleOAuthCallback(request: NextRequest): Promise<NextResponse> {
-  const { searchParams, origin: requestOrigin } = new URL(request.url);
-  /** Always the host that received the callback (Railway URL), not NEXT_PUBLIC_APP_URL (e.g. dead vidsum.ai). */
-  const origin = requestOrigin;
+  const { searchParams } = new URL(request.url);
+  /** Public site origin (Railway URL), not internal bind address (0.0.0.0). */
+  const origin = getPublicOriginForRedirect(request);
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/";
 
