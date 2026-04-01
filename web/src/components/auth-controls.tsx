@@ -44,7 +44,14 @@ export function AuthControls() {
 
   if (user === "pending") {
     return (
-      <div className="h-9 w-9 rounded-full border border-gray-700 bg-zinc-900" />
+      <div
+        className="flex h-9 items-center gap-2 rounded-lg border border-gray-700 bg-zinc-900 px-2"
+        aria-busy
+        aria-label="Loading account"
+      >
+        <div className="h-7 w-7 shrink-0 animate-pulse rounded-full bg-gray-700" />
+        <span className="hidden text-xs text-gray-500 sm:inline">Loading…</span>
+      </div>
     );
   }
 
