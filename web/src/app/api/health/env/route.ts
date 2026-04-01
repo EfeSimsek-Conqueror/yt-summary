@@ -1,4 +1,4 @@
-import { getSupadataApiKey } from "@/lib/youtube/transcript-via-supadata";
+import { readSupadataApiKey } from "@/lib/server/supadata-env";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -10,6 +10,6 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   return NextResponse.json({
-    supadataConfigured: Boolean(getSupadataApiKey()),
+    supadataConfigured: Boolean(readSupadataApiKey()),
   });
 }

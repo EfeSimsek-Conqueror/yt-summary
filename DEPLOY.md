@@ -7,7 +7,7 @@
 | `NEXT_PUBLIC_SUPABASE_URL` | Evet | Supabase → Project Settings → API |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Evet | Aynı (anon / public key) |
 | `FAL_KEY` | AI özellikleri için evet | [fal.ai](https://fal.ai/dashboard) → API Keys |
-| `SUPADATA_API_KEY` | Transcript (YouTube) için evet | [supadata.ai](https://supadata.ai) — **tam isim** `SUPADATA_API_KEY` ( `NEXT_PUBLIC_` değil). Railway’de **bu Next.js servisinin** Variables sekmesinde olmalı; ekledikten sonra **Redeploy**. Doğrulama: canlı sitede `GET /api/health/env` → `{"supadataConfigured":true}` olmalı. |
+| `SUPADATA_API_KEY` | Transcript (YouTube) için evet | [supadata.ai](https://supadata.ai) — **tam isim** `SUPADATA_API_KEY` veya `SUPADATA_KEY` ( `NEXT_PUBLIC_` değil). Railway’de **bu Next.js servisinin** Variables sekmesinde olmalı; ekledikten sonra **Redeploy**. Okuma `web/src/lib/server/supadata-env.ts` içinde (build sırasında sabitlenmesin diye string birleştirme ile). Doğrulama: `GET /api/health/env` → `{"supadataConfigured":true}`. |
 | `NEXT_PUBLIC_APP_URL` | Önerilir (OAuth + metadata) | Railway’de servisin public URL’si, örn. `https://yt-summary-production-xxxx.up.railway.app` — custom domain yokken bunu kullanın; Supabase **Site URL** ve redirect listesi ile aynı olmalı. DNS çalışmayan `vidsum.ai` burada ve Supabase’te tanımlıysa giriş hata verir; geçici olarak Railway URL’sine çevirin. |
 
 **Asla repoya commit etmeyin:** `.env.local`, gerçek `FAL_KEY` veya `service_role` anahtarı.

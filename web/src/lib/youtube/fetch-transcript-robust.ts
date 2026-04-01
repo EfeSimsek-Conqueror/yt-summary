@@ -1,10 +1,13 @@
 import type { TranscriptResponse } from "youtube-transcript";
 import { YoutubeTranscriptNotAvailableError } from "youtube-transcript";
 import { parseYoutubeVideoId } from "./video-id";
-import {
-  fetchTranscriptViaSupadata,
-  getSupadataApiKey,
-} from "./transcript-via-supadata";
+import { readSupadataApiKey } from "@/lib/server/supadata-env";
+import { fetchTranscriptViaSupadata } from "./transcript-via-supadata";
+
+export type FetchTranscriptRobustOptions = {
+  /** Explicit key from the caller (e.g. Route Handler) when env read must match host. */
+  supadataApiKey?: string;
+};
 
 /** Reuse transcript for the same video to avoid repeat API calls. */
 const TRANSCRIPT_CACHE_TTL_MS = 45 * 60 * 1000;
@@ -60,13 +63,16 @@ function withTimeout<T>(
  */
 async function fetchTranscriptOnce(
   videoIdRaw: string,
+  opts?: FetchTranscriptRobustOptions,
 ): Promise<TranscriptResponse[]> {
   const vid = parseYoutubeVideoId(videoIdRaw) ?? videoIdRaw.trim();
   if (!/^[\w-]{11}$/.test(vid)) {
     throw new YoutubeTranscriptNotAvailableError(vid);
   }
 
-  if (!getSupadataApiKey()) {
+  const resolvedKey =
+    opts?.supadataApiKey?.trim() || readSupadataApiKey();
+  if (!resolvedKey) {
     throw new Error(
       "SUPADATA_API_KEY is not configured on the server. Transcripts require Supadata.",
     );
@@ -74,7 +80,7 @@ async function fetchTranscriptOnce(
 
   try {
     const rows = await withTimeout(
-      fetchTranscriptViaSupadata(vid),
+      fetchTranscriptViaSupadata(vid, resolvedKey),
       SUPADATA_FETCH_TIMEOUT_MS,
       vid,
     );
@@ -103,10 +109,11 @@ async function fetchTranscriptOnce(
  */
 export async function fetchTranscriptRobust(
   videoIdRaw: string,
+  opts?: FetchTranscriptRobustOptions,
 ): Promise<TranscriptResponse[]> {
   const vid = parseYoutubeVideoId(videoIdRaw) ?? videoIdRaw.trim();
   if (!/^[\w-]{11}$/.test(vid)) {
-    return fetchTranscriptOnce(videoIdRaw);
+    return fetchTranscriptOnce(videoIdRaw, opts);
   }
 
   const now = Date.now();
@@ -121,7 +128,7 @@ export async function fetchTranscriptRobust(
 
   const p = (async () => {
     try {
-      const rows = await fetchTranscriptOnce(videoIdRaw);
+      const rows = await fetchTranscriptOnce(videoIdRaw, opts);
       if (rows.length > 0) {
         transcriptCache.set(vid, {
           rows: rows.map((r) => ({ ...r })),

@@ -9,6 +9,7 @@ import {
   buildPlainTranscript,
   buildTimedTranscriptForModel,
 } from "@/lib/youtube/transcript-for-analysis";
+import { readSupadataApiKey } from "@/lib/server/supadata-env";
 import { fetchTranscriptRobust } from "@/lib/youtube/fetch-transcript-robust";
 import type { TranscriptResponse } from "youtube-transcript";
 import {
@@ -131,17 +132,38 @@ export async function POST(request: NextRequest) {
         ? Math.round(resolvedDurationSec)
         : undefined;
 
+    const supadataKey = readSupadataApiKey();
+    const pasted = parsed.data.transcriptPlain?.trim();
+    const pastedOk =
+      !!pasted && pasted.length >= MIN_TRANSCRIPT_PLAIN_CHARS;
+    if (!supadataKey && !pastedOk) {
+      return NextResponse.json(
+        {
+          error:
+            "SUPADATA_API_KEY is not configured on the server. Add SUPADATA_API_KEY in Railway (or web/.env.local), redeploy, then open /api/health/env — supadataConfigured must be true.",
+        },
+        { status: 503 },
+      );
+    }
+
     let items: TranscriptResponse[] | null = null;
     let transcriptFetchError: { status: number; message: string } | null =
       null;
-    try {
-      items = await fetchTranscriptRobust(parsed.data.videoId);
-    } catch (e) {
-      transcriptFetchError = mapTranscriptError(e);
-      if (transcriptFetchError.status >= 500) {
-        console.error("[video-analysis] transcript", e);
-      } else {
-        console.warn("[video-analysis] transcript", transcriptFetchError.message);
+    if (supadataKey) {
+      try {
+        items = await fetchTranscriptRobust(parsed.data.videoId, {
+          supadataApiKey: supadataKey,
+        });
+      } catch (e) {
+        transcriptFetchError = mapTranscriptError(e);
+        if (transcriptFetchError.status >= 500) {
+          console.error("[video-analysis] transcript", e);
+        } else {
+          console.warn(
+            "[video-analysis] transcript",
+            transcriptFetchError.message,
+          );
+        }
       }
     }
 

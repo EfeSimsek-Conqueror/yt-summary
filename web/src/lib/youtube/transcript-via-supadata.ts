@@ -4,6 +4,7 @@ import {
   YoutubeTranscriptTooManyRequestError,
   YoutubeTranscriptVideoUnavailableError,
 } from "youtube-transcript";
+import { readSupadataApiKey } from "@/lib/server/supadata-env";
 import { youtubeWatchUrl } from "./video-id";
 
 const BASE = "https://api.supadata.ai/v1";
@@ -15,19 +16,9 @@ function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/**
- * Read live `process.env` (Railway injects here). Avoid importing `node:process` —
- * some Next bundles use a stub with an empty env. Alias: SUPADATA_KEY.
- */
-const KEY_PRIMARY = ["SUPADATA", "API", "KEY"].join("_");
-const KEY_ALT = ["SUPADATA", "KEY"].join("_");
-
+/** @deprecated Use readSupadataApiKey from @/lib/server/supadata-env — kept for imports. */
 export function getSupadataApiKey(): string | undefined {
-  const env = globalThis.process?.env;
-  if (!env) return undefined;
-  const raw = env[KEY_PRIMARY] ?? env[KEY_ALT];
-  const k = typeof raw === "string" ? raw.trim() : "";
-  return k || undefined;
+  return readSupadataApiKey();
 }
 
 type TranscriptChunk = {
@@ -152,8 +143,10 @@ async function pollTranscriptJob(
  */
 export async function fetchTranscriptViaSupadata(
   videoId: string,
+  /** When set (e.g. from API route), avoids a second env read. */
+  apiKeyOverride?: string,
 ): Promise<TranscriptResponse[]> {
-  const apiKey = getSupadataApiKey();
+  const apiKey = apiKeyOverride?.trim() || readSupadataApiKey();
   if (!apiKey) {
     throw new Error("SUPADATA_API_KEY is not configured");
   }
