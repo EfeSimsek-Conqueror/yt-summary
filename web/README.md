@@ -2,7 +2,7 @@
 
 Next.js app for YouTube subscriptions, search, and AI-powered summaries.
 
-**Production:** [vidsum.ai](https://vidsum.ai) — set `NEXT_PUBLIC_APP_URL=https://vidsum.ai` and Supabase redirect URLs for that domain.
+**Production URL:** set `NEXT_PUBLIC_APP_URL` to your live origin (e.g. `https://….up.railway.app` until DNS for `vidsum.ai` works), and add **`…/oauth/return`** to Supabase **Redirect URLs** (same origin as Site URL). Root `/?code=` is forwarded to `/oauth/return` in middleware.
 
 Bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 

@@ -15,8 +15,11 @@ function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+/** Runtime read (avoid build-time env inlining missing Railway-only secrets). */
 export function getSupadataApiKey(): string | undefined {
-  const k = process.env.SUPADATA_API_KEY?.trim();
+  const raw =
+    process.env.SUPADATA_API_KEY ?? process.env["SUPADATA_API_KEY"];
+  const k = typeof raw === "string" ? raw.trim() : "";
   return k || undefined;
 }
 

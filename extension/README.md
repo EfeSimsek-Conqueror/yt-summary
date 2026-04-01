@@ -25,7 +25,7 @@ Enable **“Show floating panel on YouTube”** in the popup, then open a **norm
 ### “I can’t sign in”
 
 1. Wrong URL → fix base URL (especially `http` vs `https` for localhost).
-2. Supabase **Redirect URLs** must include `http://localhost:3000/auth/callback` (and your prod callback URL) in the Supabase dashboard.
+2. Supabase **Redirect URLs** must include `http://localhost:3000/oauth/return` (and your prod callback URL) in the Supabase dashboard.
 3. After Google login in a normal VidSum tab, **Refresh status** in the popup or options so the extension sees your `sb-*-auth-token` cookies.
 4. After updating the extension, click **Reload** on `chrome://extensions` so new permissions (`cookies`, `https://*/*`) apply.
 

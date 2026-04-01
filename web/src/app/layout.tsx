@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { resolveSiteUrlForMetadata } from "@/lib/app-url-server";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
@@ -13,28 +14,26 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-/** Production: https://vidsum.ai — override with NEXT_PUBLIC_APP_URL in preview/staging. */
-const siteUrl =
-  process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") ||
-  "https://vidsum.ai";
-
-export const metadata: Metadata = {
-  metadataBase: new URL(`${siteUrl}/`),
-  title: {
-    default: "VidSum",
-    template: "%s · VidSum",
-  },
-  description:
-    "VidSum — AI summaries, segments, and takeaways for your YouTube subscriptions and search.",
-  openGraph: {
-    type: "website",
-    siteName: "VidSum",
-    url: siteUrl,
-  },
-  twitter: {
-    card: "summary_large_image",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const siteUrl = await resolveSiteUrlForMetadata();
+  return {
+    metadataBase: new URL(`${siteUrl}/`),
+    title: {
+      default: "VidSum",
+      template: "%s · VidSum",
+    },
+    description:
+      "VidSum — AI summaries, segments, and takeaways for your YouTube subscriptions and search.",
+    openGraph: {
+      type: "website",
+      siteName: "VidSum",
+      url: siteUrl,
+    },
+    twitter: {
+      card: "summary_large_image",
+    },
+  };
+}
 
 export default function RootLayout({
   children,

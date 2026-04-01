@@ -1,5 +1,6 @@
 "use client";
 
+import { OAUTH_CALLBACK_PATH } from "@/lib/auth/oauth-callback-path";
 import { getOAuthRedirectOrigin } from "@/lib/app-url";
 import { createClient } from "@/lib/supabase/client";
 
@@ -14,7 +15,7 @@ export async function signInWithGoogle(next: string = "/") {
   await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(safeNext)}`,
+      redirectTo: `${origin}${OAUTH_CALLBACK_PATH}?next=${encodeURIComponent(safeNext)}`,
       scopes: YOUTUBE_GOOGLE_SCOPES,
       queryParams: {
         access_type: "offline",
@@ -35,7 +36,7 @@ export async function linkGoogleForYoutube(next: string = "/") {
   const { error } = await supabase.auth.linkIdentity({
     provider: "google",
     options: {
-      redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(safeNext)}`,
+      redirectTo: `${origin}${OAUTH_CALLBACK_PATH}?next=${encodeURIComponent(safeNext)}`,
       scopes: YOUTUBE_GOOGLE_SCOPES,
       queryParams: {
         access_type: "offline",
