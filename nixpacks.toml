@@ -1,3 +1,13 @@
-# Monorepo kökünden Railway deploy: Nixpacks varsayılan Node zinciri.
+# Monorepo: Next.js app is in `web/`. Railway must build from repo root OR set Service → Root Directory → `web`.
+# If you use Root Directory = `web`, this file is ignored; `web/nixpacks.toml` applies instead.
+
 [phases.setup]
-nixPkgs = ["..."]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+dependsOn = ["setup"]
+cmds = ["npm ci --prefix web"]
+
+[phases.build]
+dependsOn = ["install"]
+cmds = ["npm run build --prefix web"]

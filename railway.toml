@@ -1,0 +1,12 @@
+# Monorepo: Next.js in `web/`. Use NIXPACKS + root `nixpacks.toml` so Railway does not rely on Railpack auto-detect.
+# Alternative: Service → Root Directory = `web` (then `web/railway.toml` applies).
+
+[build]
+builder = "NIXPACKS"
+nixpacksConfigPath = "nixpacks.toml"
+
+[deploy]
+startCommand = "npm run start"
+healthcheckPath = "/"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"

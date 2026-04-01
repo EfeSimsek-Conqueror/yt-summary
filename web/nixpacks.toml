@@ -1,3 +1,11 @@
-# Transcript: Supadata API (`SUPADATA_API_KEY`); ek sistem paketi gerekmez.
+# Next.js app root when Railway Root Directory = `web`
 [phases.setup]
-nixPkgs = ["..."]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+dependsOn = ["setup"]
+cmds = ["npm ci"]
+
+[phases.build]
+dependsOn = ["install"]
+cmds = ["npm run build"]
