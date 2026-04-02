@@ -9,6 +9,7 @@ import {
   getVideosForHome,
   getVideosFromYoutubeSearch,
 } from "@/lib/videos-for-home";
+import { redirect } from "next/navigation";
 
 type Props = {
   searchParams: Promise<{ channel?: string; q?: string }>;
@@ -19,6 +20,12 @@ export default async function DashboardPage({ searchParams }: Props) {
   const searchQuery =
     typeof qParam === "string" ? qParam.trim() : "";
   const isSearch = searchQuery.length > 0;
+  const channelId =
+    typeof channelParam === "string" ? channelParam.trim() : "";
+
+  if (!channelId && !isSearch) {
+    redirect("/dashboard/discover");
+  }
 
   const supabase = await createClient();
   const {
@@ -34,8 +41,8 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   const resolvedId =
     channels.length > 0
-      ? channelParam && channels.some((c) => c.id === channelParam)
-        ? channelParam
+      ? channelId && channels.some((c) => c.id === channelId)
+        ? channelId
         : channels[0]!.id
       : "c1";
 

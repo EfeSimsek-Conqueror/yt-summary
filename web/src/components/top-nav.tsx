@@ -9,7 +9,7 @@ export function TopNav() {
       aria-label="Top navigation"
     >
       <Link
-        href="/dashboard"
+        href="/dashboard/discover"
         className="flex items-center gap-2 transition-opacity hover:opacity-90"
       >
         <div

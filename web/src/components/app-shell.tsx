@@ -16,6 +16,11 @@ type Props = {
   subscriptionSidebar?: boolean;
   /** Highlights Discover vs home subscriptions in the sidebar. */
   sidebarActiveView?: "dashboard" | "discover";
+  /**
+   * "hidden" = main column does not scroll; children control overflow (e.g. Discover).
+   * Default "auto" = standard scrolling main area.
+   */
+  mainOverflow?: "auto" | "hidden";
   children: React.ReactNode;
 };
 
@@ -26,6 +31,7 @@ export function AppShell({
   isAuthenticated = true,
   subscriptionSidebar = true,
   sidebarActiveView = "dashboard",
+  mainOverflow = "auto",
   children,
 }: Props) {
   const showGuestGate = !isAuthenticated;
@@ -51,7 +57,15 @@ export function AppShell({
                 sidebarActiveView={sidebarActiveView}
               />
             ) : null}
-            <div className="min-w-0 flex-1 overflow-auto">{children}</div>
+            <div
+              className={
+                mainOverflow === "hidden"
+                  ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+                  : "min-h-0 min-w-0 flex-1 overflow-auto"
+              }
+            >
+              {children}
+            </div>
           </div>
           {showGuestGate ? <GuestLoginOverlay /> : null}
         </div>
