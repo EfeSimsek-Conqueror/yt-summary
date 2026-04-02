@@ -15,12 +15,7 @@ import {
 } from "lucide-react";
 import type { LandingSong } from "@/data/landing-coverflow-songs";
 import { LandingVideoMarquee } from "@/components/landing/landing-video-marquee";
-import {
-  CREDITS_PER_5_MIN_BLOCK,
-  type PlanId,
-  PLAN_ORDER,
-  PLANS,
-} from "@/lib/billing/plans";
+import { type PlanId, PLAN_ORDER, PLANS } from "@/lib/billing/plans";
 
 const PLAN_FEATURES: Record<PlanId, string[]> = {
   scout: [
@@ -357,8 +352,8 @@ export function VynoraLanding({ songs }: VynoraLandingProps) {
             Credits scale with watch time—pick Scout, Navigator, or Captain
           </p>
           <p className="mt-3 text-sm text-gray-500">
-            Analysis uses {CREDITS_PER_5_MIN_BLOCK} credits per 5 minutes of
-            video (rounded up to the next block).
+            Analysis uses 1 credit per 3 minutes of video, scaled to length (e.g.
+            3:10 ≈ 1.06 credits).
           </p>
         </motion.div>
 

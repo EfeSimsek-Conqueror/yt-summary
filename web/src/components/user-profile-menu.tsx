@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCreditsDisplay } from "@/lib/billing/video-credits";
 import { PLANS, type PlanId } from "@/lib/billing/plans";
 import type { User } from "@supabase/supabase-js";
 import {
@@ -60,14 +61,6 @@ type Props = {
   user: User;
   onSignOut: () => void | Promise<void>;
 };
-
-/** Until billing is wired to Supabase, show default Scout + full starter credits. */
-function getPlanSnapshot(): { planId: PlanId; creditsRemaining: number } {
-  return {
-    planId: "scout",
-    creditsRemaining: PLANS.scout.creditsIncluded,
-  };
-}
 
 function getInitials(user: User): string {
   const name = user.user_metadata?.full_name;
@@ -185,12 +178,51 @@ function UserAvatar({ user, size = "md" }: { user: User; size?: "sm" | "md" }) {
 export function UserProfileMenu({ user, onSignOut }: Props) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const { planId, creditsRemaining } = getPlanSnapshot();
+  const [planId] = useState<PlanId>("scout");
+  const [creditsRemaining, setCreditsRemaining] = useState<number | null>(
+    null,
+  );
   const plan = PLANS[planId];
   const creditsLabel =
-    plan.creditsPeriod === "once"
-      ? `${creditsRemaining} credits to use`
-      : `${creditsRemaining} credits left this month`;
+    creditsRemaining === null
+      ? "Loading credits…"
+      : plan.creditsPeriod === "once"
+        ? `${formatCreditsDisplay(creditsRemaining)} credits to use`
+        : `${formatCreditsDisplay(creditsRemaining)} credits left this month`;
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/me/credits", { credentials: "include" });
+        if (!res.ok) return;
+        const j = (await res.json()) as { creditsRemaining?: number };
+        if (
+          typeof j.creditsRemaining === "number" &&
+          !cancelled
+        ) {
+          setCreditsRemaining(j.creditsRemaining);
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user.id]);
+
+  useEffect(() => {
+    function onCreditsUpdated(e: Event) {
+      const ce = e as CustomEvent<{ remaining: number }>;
+      if (typeof ce.detail?.remaining === "number") {
+        setCreditsRemaining(ce.detail.remaining);
+      }
+    }
+    window.addEventListener("vidsum-credits-updated", onCreditsUpdated);
+    return () =>
+      window.removeEventListener("vidsum-credits-updated", onCreditsUpdated);
+  }, []);
 
   useEffect(() => {
     if (!open) return;

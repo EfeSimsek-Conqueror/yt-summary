@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { analyzeTranscriptWithGeminiFlash } from "@/lib/ai/analyze-transcript";
+import {
+  checkCreditsForAnalysis,
+  deductCreditsAfterAnalysis,
+} from "@/lib/billing/analysis-credits-server";
 import { getFalKey } from "@/lib/ai/fal-openai";
 import { createClient } from "@/lib/supabase/server";
 
@@ -42,8 +46,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const billingDurationSec =
+      parsed.data.videoDurationSec != null && parsed.data.videoDurationSec > 0
+        ? Math.round(parsed.data.videoDurationSec)
+        : 180;
+
+    const creditCheck = await checkCreditsForAnalysis(
+      supabase,
+      user.id,
+      billingDurationSec,
+    );
+    if (!creditCheck.ok) {
+      return creditCheck.response;
+    }
+    const { creditsBefore } = creditCheck;
+
     const analysis = await analyzeTranscriptWithGeminiFlash(parsed.data);
-    return NextResponse.json(analysis);
+    const { creditsRemaining, creditsCharged } =
+      await deductCreditsAfterAnalysis(
+        supabase,
+        billingDurationSec,
+        creditsBefore,
+      );
+
+    return NextResponse.json({
+      ...analysis,
+      creditsCharged,
+      creditsRemaining,
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Analysis failed";
     console.error("[analyze-transcript]", e);

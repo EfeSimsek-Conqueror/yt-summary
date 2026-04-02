@@ -23,3 +23,19 @@ export function buildTimedTranscriptForModel(
 export function buildPlainTranscript(items: TranscriptResponse[]): string {
   return items.map((i) => i.text).join(" ");
 }
+
+/** Last caption end time in seconds (for billing when video duration is unknown). */
+export function estimateDurationSecondsFromTranscriptItems(
+  items: TranscriptResponse[],
+): number | null {
+  if (!items.length) return null;
+  let maxEnd = 0;
+  for (const item of items) {
+    const useMs = item.duration > 60;
+    const startSec = captionStartSeconds(item.offset, item.duration);
+    const durSec = useMs ? item.duration / 1000 : item.duration;
+    const end = startSec + durSec;
+    if (Number.isFinite(end) && end > maxEnd) maxEnd = end;
+  }
+  return maxEnd > 0 ? Math.max(1, Math.ceil(maxEnd)) : null;
+}

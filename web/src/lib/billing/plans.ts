@@ -1,10 +1,14 @@
 /**
- * VidSum tier names and credit limits. Used by landing UI and (later) billing.
- * Usage: 3 credits per 5 minutes of analyzed video.
+ * VidSum tier names and credit limits. Used by landing UI and billing.
+ * Usage: 1 credit per 3 minutes of analyzed video (proportional by duration).
  */
 
 export type PlanId = "scout" | "navigator" | "captain";
 
+/** 3 minutes of video = 1 credit. */
+export const SECONDS_PER_CREDIT = 180;
+
+/** @deprecated Use SECONDS_PER_CREDIT; old marketing copy used 5 min blocks. */
 export const CREDITS_PER_5_MIN_BLOCK = 3;
 
 export type PlanDefinition = {

@@ -6,8 +6,13 @@ import { createClient } from "@/lib/supabase/server";
 import { parseYoutubeVideoId } from "@/lib/youtube/video-id";
 import { parseDurationLabelToSeconds } from "@/lib/youtube/iso-duration";
 import {
+  checkCreditsForAnalysis,
+  deductCreditsAfterAnalysis,
+} from "@/lib/billing/analysis-credits-server";
+import {
   buildPlainTranscript,
   buildTimedTranscriptForModel,
+  estimateDurationSecondsFromTranscriptItems,
 } from "@/lib/youtube/transcript-for-analysis";
 import { readSupadataApiKey } from "@/lib/server/supadata-env";
 import { fetchTranscriptRobust } from "@/lib/youtube/fetch-transcript-robust";
@@ -206,11 +211,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    /** Billing length: metadata → caption timing → 3 min default (pasted / unknown). */
+    const billingDurationSec =
+      videoDurationSecForAnalysis != null && videoDurationSecForAnalysis > 0
+        ? videoDurationSecForAnalysis
+        : haveCaptions && items && items.length > 0
+          ? (estimateDurationSecondsFromTranscriptItems(items) ?? 180)
+          : 180;
+
+    const creditCheck = await checkCreditsForAnalysis(
+      supabase,
+      user.id,
+      billingDurationSec,
+    );
+    if (!creditCheck.ok) {
+      return creditCheck.response;
+    }
+    const { creditsBefore } = creditCheck;
+
     const analysis = await analyzeTranscriptWithGeminiFlash({
       transcript: forModel,
       videoTitle: parsed.data.videoTitle,
       videoDurationSec: videoDurationSecForAnalysis,
     });
+
+    const { creditsRemaining, creditsCharged } =
+      await deductCreditsAfterAnalysis(
+        supabase,
+        billingDurationSec,
+        creditsBefore,
+      );
 
     return NextResponse.json({
       contentKind: analysis.content_kind,
@@ -224,6 +254,8 @@ export async function POST(request: NextRequest) {
       hypeMoments: analysis.hype_moments,
       transcriptDensityScore: null,
       usedVisualFallback: false,
+      creditsCharged,
+      creditsRemaining,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Analysis failed";

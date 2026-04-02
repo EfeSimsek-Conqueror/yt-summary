@@ -399,9 +399,20 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
         }
 
         if (!res.ok) {
+          const payload = data as { error?: string; message?: string };
+          if (res.status === 402) {
+            const msg =
+              typeof payload.message === "string"
+                ? payload.message
+                : typeof payload.error === "string"
+                  ? payload.error
+                  : "Not enough credits to analyze this video.";
+            setAnalysisError(msg);
+            return;
+          }
           const err =
-            typeof (data as { error?: string }).error === "string"
-              ? (data as { error: string }).error
+            typeof payload.error === "string"
+              ? payload.error
               : "Request failed";
           setAnalysisError(err);
           return;
@@ -418,6 +429,8 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
           hypeMoments?: unknown;
           usedVisualFallback?: boolean;
           transcriptDensityScore?: number | null;
+          creditsRemaining?: number;
+          creditsCharged?: number;
         };
         const revelations = Array.isArray(d.revelations)
           ? d.revelations.filter((x): x is string => typeof x === "string")
@@ -461,6 +474,13 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
                 ? null
                 : undefined,
         });
+        if (typeof d.creditsRemaining === "number") {
+          window.dispatchEvent(
+            new CustomEvent("vidsum-credits-updated", {
+              detail: { remaining: d.creditsRemaining },
+            }),
+          );
+        }
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") {
           return;

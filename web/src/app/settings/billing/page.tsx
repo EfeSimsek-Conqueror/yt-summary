@@ -1,14 +1,25 @@
 import { formatPlanPrice, PLANS } from "@/lib/billing/plans";
+import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 
-/** Matches profile menu until Supabase billing is wired. */
-function getPlanSnapshot() {
-  return { planId: "scout" as const, creditsRemaining: PLANS.scout.creditsIncluded };
-}
+export default async function BillingPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-export default function BillingPage() {
-  const { planId, creditsRemaining } = getPlanSnapshot();
+  let creditsRemaining = PLANS.scout.creditsIncluded;
+  if (user) {
+    const { data } = await supabase
+      .from("user_credits")
+      .select("credits_remaining")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (data) creditsRemaining = Number(data.credits_remaining);
+  }
+
+  const planId = "scout" as const;
   const plan = PLANS[planId];
   const creditsDetail =
     plan.creditsPeriod === "once"
@@ -41,7 +52,8 @@ export default function BillingPage() {
                 {formatPlanPrice(plan)}
               </p>
               <p className="mt-2 text-xs text-gray-500">
-                Usage: 3 credits per 5 minutes of analyzed video.
+                Usage: 1 credit per 3 minutes of analyzed video (proportional to
+                length).
               </p>
             </div>
             <span className="inline-flex rounded-md border border-purple-500/35 bg-purple-500/15 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-purple-200">
