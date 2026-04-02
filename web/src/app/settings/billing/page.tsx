@@ -1,4 +1,6 @@
-import { formatPlanPrice, PLANS } from "@/lib/billing/plans";
+import { BillingStripeActions } from "@/components/billing-stripe-actions";
+import { formatPlanPrice, PLANS, type PlanId } from "@/lib/billing/plans";
+import { effectivePlanIdFromSubscriptionRow } from "@/lib/billing/resolve-plan";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
@@ -10,21 +12,47 @@ export default async function BillingPage() {
   } = await supabase.auth.getUser();
 
   let creditsRemaining = PLANS.scout.creditsIncluded;
+  let effectivePlanId: PlanId = "scout";
+  let hasStripeCustomer = false;
+
   if (user) {
-    const { data } = await supabase
+    const { data: creditRow } = await supabase
       .from("user_credits")
       .select("credits_remaining")
       .eq("user_id", user.id)
       .maybeSingle();
-    if (data) creditsRemaining = Number(data.credits_remaining);
+    if (creditRow) creditsRemaining = Number(creditRow.credits_remaining);
+
+    const { data: subRow } = await supabase
+      .from("billing_subscriptions")
+      .select("plan_id, status")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    effectivePlanId = effectivePlanIdFromSubscriptionRow(
+      subRow
+        ? {
+            plan_id: subRow.plan_id as string,
+            status: subRow.status as string,
+          }
+        : null,
+    );
+
+    const { data: custRow } = await supabase
+      .from("stripe_customers")
+      .select("stripe_customer_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    hasStripeCustomer = Boolean(custRow?.stripe_customer_id);
   }
 
-  const planId = "scout" as const;
-  const plan = PLANS[planId];
+  const plan = PLANS[effectivePlanId];
   const creditsDetail =
     plan.creditsPeriod === "once"
       ? `${creditsRemaining} credits included with ${plan.shortName}`
-      : `${creditsRemaining} credits per month`;
+      : `${creditsRemaining} credits this billing period`;
+
+  const stripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY?.trim());
 
   return (
     <main className="p-6 px-7 lg:p-7">
@@ -33,7 +61,7 @@ export default async function BillingPage() {
           Billing & plan
         </h1>
         <p className="mt-1 text-sm text-muted">
-          Your current tier and usage. Upgrade options are on the marketing site.
+          Your current tier and usage. Paid plans bill through Stripe.
         </p>
       </header>
 
@@ -61,6 +89,20 @@ export default async function BillingPage() {
             </span>
           </div>
         </div>
+
+        {user && stripeConfigured ? (
+          <div className="rounded-xl border border-gray-800 bg-zinc-950/80 p-5">
+            <BillingStripeActions
+              planId={effectivePlanId}
+              hasStripeCustomer={hasStripeCustomer}
+            />
+          </div>
+        ) : user && !stripeConfigured ? (
+          <p className="text-sm text-gray-500">
+            Stripe is not configured on this deployment — paid checkout is
+            unavailable.
+          </p>
+        ) : null}
 
         <Link
           href="/#pricing"

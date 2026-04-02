@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { PLANS, type PlanId } from "@/lib/billing/plans";
+import { PLANS } from "@/lib/billing/plans";
+import { effectivePlanIdFromSubscriptionRow } from "@/lib/billing/resolve-plan";
 
 export const runtime = "nodejs";
 
@@ -25,7 +26,21 @@ export async function GET() {
 
   const creditsRemaining =
     row != null ? Number(row.credits_remaining) : PLANS.scout.creditsIncluded;
-  const planId: PlanId = "scout";
+
+  const { data: subRow } = await supabase
+    .from("billing_subscriptions")
+    .select("plan_id, status")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const planId = effectivePlanIdFromSubscriptionRow(
+    subRow
+      ? {
+          plan_id: subRow.plan_id as string,
+          status: subRow.status as string,
+        }
+      : null,
+  );
 
   return NextResponse.json({
     creditsRemaining,

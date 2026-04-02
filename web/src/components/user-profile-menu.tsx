@@ -178,7 +178,7 @@ function UserAvatar({ user, size = "md" }: { user: User; size?: "sm" | "md" }) {
 export function UserProfileMenu({ user, onSignOut }: Props) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [planId] = useState<PlanId>("scout");
+  const [planId, setPlanId] = useState<PlanId>("scout");
   const [creditsRemaining, setCreditsRemaining] = useState<number | null>(
     null,
   );
@@ -196,12 +196,16 @@ export function UserProfileMenu({ user, onSignOut }: Props) {
       try {
         const res = await fetch("/api/me/credits", { credentials: "include" });
         if (!res.ok) return;
-        const j = (await res.json()) as { creditsRemaining?: number };
-        if (
-          typeof j.creditsRemaining === "number" &&
-          !cancelled
-        ) {
+        const j = (await res.json()) as {
+          creditsRemaining?: number;
+          planId?: PlanId;
+        };
+        if (cancelled) return;
+        if (typeof j.creditsRemaining === "number") {
           setCreditsRemaining(j.creditsRemaining);
+        }
+        if (j.planId === "navigator" || j.planId === "captain" || j.planId === "scout") {
+          setPlanId(j.planId);
         }
       } catch {
         /* ignore */
@@ -214,9 +218,16 @@ export function UserProfileMenu({ user, onSignOut }: Props) {
 
   useEffect(() => {
     function onCreditsUpdated(e: Event) {
-      const ce = e as CustomEvent<{ remaining: number }>;
+      const ce = e as CustomEvent<{ remaining: number; planId?: PlanId }>;
       if (typeof ce.detail?.remaining === "number") {
         setCreditsRemaining(ce.detail.remaining);
+      }
+      if (
+        ce.detail?.planId === "navigator" ||
+        ce.detail?.planId === "captain" ||
+        ce.detail?.planId === "scout"
+      ) {
+        setPlanId(ce.detail.planId);
       }
     }
     window.addEventListener("vidsum-credits-updated", onCreditsUpdated);
