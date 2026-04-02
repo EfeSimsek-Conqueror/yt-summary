@@ -1,4 +1,5 @@
 import { OAUTH_CALLBACK_PATH } from "@/lib/auth/oauth-callback-path";
+import { getPublicOriginFromRequest } from "@/lib/auth/request-public-origin";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -6,7 +7,8 @@ export async function middleware(request: NextRequest) {
   const url = request.nextUrl.clone();
   /** Supabase sometimes sends `code` to Site URL root — forward to OAuth handler. */
   if (url.pathname === "/" && url.searchParams.has("code")) {
-    const dest = new URL(OAUTH_CALLBACK_PATH, url.origin);
+    const origin = getPublicOriginFromRequest(request);
+    const dest = new URL(OAUTH_CALLBACK_PATH, `${origin}/`);
     dest.search = url.search;
     return NextResponse.redirect(dest);
   }

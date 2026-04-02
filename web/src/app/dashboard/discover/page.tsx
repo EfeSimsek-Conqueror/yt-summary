@@ -2,6 +2,7 @@ import { AppShell } from "@/components/app-shell";
 import { VideoCard } from "@/components/video-card";
 import { VideoSearchBar } from "@/components/video-search-bar";
 import { YoutubeSyncHint } from "@/components/youtube-sync-hint";
+import { userHasGoogleIdentity } from "@/lib/auth/google-identity";
 import { DISCOVER_CATEGORIES } from "@/lib/discover-categories";
 import { getChannelsForUser } from "@/lib/channels-for-user";
 import { getVideosForChannel } from "@/lib/mock-data";
@@ -55,6 +56,7 @@ export default async function DiscoverPage() {
   );
 
   const signedIn = Boolean(user);
+  const hasGoogleIdentity = userHasGoogleIdentity(user);
   const firstError = rowsRaw.find((r) => r.uploadsError)?.uploadsError;
   const anyRowHasVideos = rowsRaw.some((r) => r.videos.length > 0);
   const useQuotaFallback =
@@ -78,16 +80,19 @@ export default async function DiscoverPage() {
         : "Sign in with Google (YouTube) to load Discover."
       : firstError === "missing_provider_token"
         ? signedIn
-          ? "You’re logged in — use “Allow YouTube access” so your session gets a Google token (YouTube Data API)."
+          ? hasGoogleIdentity
+            ? "Grant YouTube access once — Google sign-in alone doesn’t turn on YouTube’s API for subs/search."
+            : "Use “Allow YouTube access” in the banner to link Google for YouTube Data API."
           : "Sign in with Google (YouTube) for Discover."
         : sanitizeYoutubeErrorForUi(firstError ?? "");
 
   const rowUploadsMessage = (uploadsError: string | undefined) => {
     if (!uploadsError) return "";
     if (uploadsError === "missing_provider_token") {
-      return signedIn
-        ? "You’re logged in — use “Allow YouTube access” so your session gets a Google token."
-        : "Sign in with Google (YouTube) for Discover.";
+      if (!signedIn) return "Sign in with Google (YouTube) for Discover.";
+      return hasGoogleIdentity
+        ? "Grant YouTube access once — Google sign-in alone doesn’t enable YouTube’s API here."
+        : "Use “Allow YouTube access” in the banner to link Google.";
     }
     return sanitizeYoutubeErrorForUi(uploadsError);
   };
@@ -106,6 +111,7 @@ export default async function DiscoverPage() {
           youtubeError={youtubeError}
           source={source}
           isSignedIn={signedIn}
+          hasGoogleIdentity={hasGoogleIdentity}
         />
         <div className="mb-8">
           <VideoSearchBar
@@ -148,18 +154,18 @@ export default async function DiscoverPage() {
           </p>
         ) : null}
 
-        {source !== "youtube" ? (
+        {source !== "youtube" && !(signedIn && needsYoutubeScope) ? (
           <p className="mb-8 rounded-lg border border-dashed border-zinc-700 bg-zinc-900/40 px-4 py-3 text-sm text-muted">
-            {signedIn ? (
-              <>
-                You&apos;re logged in — the videos below are{" "}
-                <strong className="text-zinc-300">samples</strong>. Allow
-                YouTube access in the banner above to load real Discover results.
-              </>
-            ) : (
+            {!signedIn ? (
               <>
                 Sample catalog preview — sign in with Google (YouTube) to load
                 real Discover results per category.
+              </>
+            ) : (
+              <>
+                YouTube didn&apos;t return a channel list — showing{" "}
+                <strong className="text-zinc-300">samples</strong> below. Try
+                reconnecting Google if this persists.
               </>
             )}
           </p>

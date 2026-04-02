@@ -7,6 +7,8 @@ type Props = {
   source: "youtube" | "mock";
   /** When true, copy avoids “sign in” — user is already signed in to VidSum. */
   isSignedIn?: boolean;
+  /** Sign in with Google — copy explains YouTube API is separate from login, not “connect again”. */
+  hasGoogleIdentity?: boolean;
 };
 
 /**
@@ -18,6 +20,7 @@ export function YoutubeSyncHint({
   youtubeError,
   source,
   isSignedIn,
+  hasGoogleIdentity = false,
 }: Props) {
   if (source === "youtube" && !needsYoutubeScope && !youtubeError) {
     return null;
@@ -25,6 +28,25 @@ export function YoutubeSyncHint({
 
   if (needsYoutubeScope) {
     if (isSignedIn) {
+      const title = hasGoogleIdentity
+        ? "YouTube data isn’t enabled yet"
+        : "Connect Google for YouTube";
+      const body = hasGoogleIdentity ? (
+        <>
+          Signing in with Google only proves your account. Reading subscriptions
+          and search uses{" "}
+          <strong className="font-medium text-amber-50/95">YouTube’s API</strong>
+          , which Google keeps separate from basic login—so you approve{" "}
+          <span className="whitespace-nowrap">read-only</span> access once. Same
+          Google account; not a second sign-in.
+        </>
+      ) : (
+        <>
+          VidSum needs a Google account with permission to talk to YouTube’s
+          servers for subs and search. Use the button to link Google with the
+          right access.
+        </>
+      );
       return (
         <div
           className="mb-6 flex flex-col gap-3 rounded-xl border border-amber-500/30 bg-amber-950/25 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
@@ -43,20 +65,15 @@ export function YoutubeSyncHint({
                 id="yt-connect-title"
                 className="text-sm font-semibold text-white"
               >
-                One more step: YouTube permission
+                {title}
               </h2>
               <p className="mt-1 text-xs leading-relaxed text-amber-100/85 sm:text-sm">
-                You&apos;re logged into VidSum. Tap the button to let Google issue
-                a token with{" "}
-                <code className="rounded bg-black/30 px-1 py-0.5 text-[0.75rem]">
-                  youtube.readonly
-                </code>{" "}
-                — then this page loads real videos (not samples).
+                {body}
               </p>
             </div>
           </div>
           <ConnectYoutubeCta
-            label="Allow YouTube access"
+            label={hasGoogleIdentity ? "Grant YouTube access" : "Allow YouTube access"}
             className="w-full shrink-0 py-2.5 text-sm font-semibold sm:w-auto sm:min-w-[200px]"
           />
         </div>

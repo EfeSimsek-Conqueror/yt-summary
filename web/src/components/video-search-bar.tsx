@@ -118,7 +118,7 @@ export function VideoSearchBar({
         <input type="hidden" name="channel" value={channelContextId} />
       ) : null}
       <label className="sr-only" htmlFor="video-search-q">
-        Search YouTube videos
+        Search videos
       </label>
       <div className="relative">
         <Search

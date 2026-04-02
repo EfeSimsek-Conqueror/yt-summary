@@ -2,6 +2,7 @@ import { AppShell } from "@/components/app-shell";
 import { VideoCard } from "@/components/video-card";
 import { VideoSearchBar } from "@/components/video-search-bar";
 import { YoutubeSyncHint } from "@/components/youtube-sync-hint";
+import { userHasGoogleIdentity } from "@/lib/auth/google-identity";
 import { getChannelsForUser } from "@/lib/channels-for-user";
 import { getChannel } from "@/lib/mock-data";
 import { createClient } from "@/lib/supabase/server";
@@ -56,14 +57,17 @@ export default async function DashboardPage({ searchParams }: Props) {
     : await getVideosForHome(channel.id, source);
 
   const signedIn = Boolean(user);
+  const hasGoogleIdentity = userHasGoogleIdentity(user);
   const searchErrorDetail =
     uploadsError === "search_requires_youtube"
       ? signedIn
-        ? "You’re logged in — allow YouTube access (header) so search can use the YouTube API instead of the sample catalog."
+        ? "Grant YouTube access in the banner so search uses the live API (not samples)."
         : "Video search needs a Google account with YouTube permission."
       : uploadsError === "missing_provider_token"
         ? signedIn
-          ? "You’re logged in — use “Allow YouTube access” in the header so your session gets a Google token."
+          ? hasGoogleIdentity
+            ? "Grant YouTube access once — your Google sign-in doesn’t include YouTube’s API by itself."
+            : "Use “Allow YouTube access” in the header to link Google."
           : "Sign in with Google (YouTube) to search."
         : uploadsError;
 
@@ -80,6 +84,7 @@ export default async function DashboardPage({ searchParams }: Props) {
           youtubeError={youtubeError}
           source={source}
           isSignedIn={signedIn}
+          hasGoogleIdentity={hasGoogleIdentity}
         />
         <div className="mb-8">
           <VideoSearchBar

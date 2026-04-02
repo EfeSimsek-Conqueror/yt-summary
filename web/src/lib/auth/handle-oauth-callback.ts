@@ -1,46 +1,18 @@
 import { persistGoogleRefreshTokenIfPresent } from "@/lib/google/resolve-google-access-token";
+import { postOAuthRedirectPath, sanitizeOAuthNextPath } from "@/lib/auth/oauth-next-path";
+import { getPublicOriginFromRequest } from "@/lib/auth/request-public-origin";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
-import { resolvePublicSiteUrl } from "@/lib/app-url";
 
-/**
- * Public origin for redirects after OAuth. Do not use `new URL(request.url).origin`:
- * behind Railway/proxies the URL can be `http://0.0.0.0:8080`, which sends users to a dead address.
- */
-function getPublicOriginForRedirect(request: NextRequest): string {
-  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
-  const forwardedProtoRaw =
-    request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ?? "https";
-  const proto =
-    forwardedProtoRaw === "http" || forwardedProtoRaw === "https"
-      ? forwardedProtoRaw
-      : "https";
-
-  if (forwardedHost && forwardedHost !== "0.0.0.0") {
-    return `${proto}://${forwardedHost}`;
-  }
-
-  const host = request.headers.get("host")?.split(",")[0]?.trim();
-  if (host && !host.startsWith("0.0.0.0")) {
-    return `${proto}://${host}`;
-  }
-
-  const { hostname } = request.nextUrl;
-  if (hostname !== "0.0.0.0") {
-    return request.nextUrl.origin;
-  }
-
-  return resolvePublicSiteUrl();
-}
-
-/** Exchange Supabase OAuth `code` for session; redirect to `next` or error page. */
+/** Exchange Supabase OAuth `code` for session; redirect to safe path on this origin. */
 export async function handleOAuthCallback(request: NextRequest): Promise<NextResponse> {
   const { searchParams } = new URL(request.url);
-  /** Public site origin (Railway URL), not internal bind address (0.0.0.0). */
-  const origin = getPublicOriginForRedirect(request);
+  const origin = getPublicOriginFromRequest(request);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/";
+  const nextPath = postOAuthRedirectPath(
+    sanitizeOAuthNextPath(searchParams.get("next")),
+  );
 
   if (code) {
     const cookieStore = await cookies();
@@ -67,9 +39,11 @@ export async function handleOAuthCallback(request: NextRequest): Promise<NextRes
         data: { session },
       } = await supabase.auth.getSession();
       await persistGoogleRefreshTokenIfPresent(supabase, session);
-      return NextResponse.redirect(`${origin}${next}`);
+      const dest = new URL(nextPath, `${origin}/`);
+      return NextResponse.redirect(dest);
     }
   }
 
-  return NextResponse.redirect(`${origin}/auth/auth-code-error`);
+  const errDest = new URL("/auth/auth-code-error", `${origin}/`);
+  return NextResponse.redirect(errDest);
 }
