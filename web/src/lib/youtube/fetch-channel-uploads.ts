@@ -1,4 +1,5 @@
 import type { Video } from "@/lib/types";
+import { formatYoutubeDataApiErrorBody } from "@/lib/youtube/format-api-error";
 import { formatDurationLabel } from "@/lib/youtube/iso-duration";
 
 const YT = "https://www.googleapis.com/youtube/v3";
@@ -25,9 +26,10 @@ export async function fetchChannelUploads(
       cache: "no-store",
     });
     if (!chRes.ok) {
+      const raw = await chRes.text();
       return {
         ok: false,
-        error: await chRes.text(),
+        error: formatYoutubeDataApiErrorBody(raw, chRes.status),
         status: chRes.status,
       };
     }
@@ -52,9 +54,10 @@ export async function fetchChannelUploads(
       cache: "no-store",
     });
     if (!plRes.ok) {
+      const raw = await plRes.text();
       return {
         ok: false,
-        error: await plRes.text(),
+        error: formatYoutubeDataApiErrorBody(raw, plRes.status),
         status: plRes.status,
       };
     }
@@ -104,9 +107,10 @@ export async function fetchChannelUploads(
         cache: "no-store",
       });
       if (!vRes.ok) {
+        const raw = await vRes.text();
         return {
           ok: false,
-          error: await vRes.text(),
+          error: formatYoutubeDataApiErrorBody(raw, vRes.status),
           status: vRes.status,
         };
       }

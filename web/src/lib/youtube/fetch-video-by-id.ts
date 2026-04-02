@@ -1,4 +1,5 @@
 import type { Video } from "@/lib/types";
+import { formatYoutubeDataApiErrorBody } from "@/lib/youtube/format-api-error";
 import { formatDurationLabel } from "@/lib/youtube/iso-duration";
 
 const YT = "https://www.googleapis.com/youtube/v3";
@@ -83,7 +84,12 @@ async function fetchVideoList(
           : undefined,
     });
     if (!res.ok) {
-      return { ok: false, error: await res.text(), status: res.status };
+      const raw = await res.text();
+      return {
+        ok: false,
+        error: formatYoutubeDataApiErrorBody(raw, res.status),
+        status: res.status,
+      };
     }
     const data = await res.json();
     return parseVideosListBody(data);

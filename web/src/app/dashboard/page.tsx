@@ -59,12 +59,12 @@ export default async function DashboardPage({ searchParams }: Props) {
   const searchErrorDetail =
     uploadsError === "search_requires_youtube"
       ? signedIn
-        ? "Connect Google for YouTube — your VidSum account is signed in, but search needs a YouTube API token (not the sample catalog)."
-        : "Video search needs a Google sign-in with YouTube access (not the sample catalog)."
+        ? "You’re logged in — allow YouTube access (header) so search can use the YouTube API instead of the sample catalog."
+        : "Video search needs a Google account with YouTube permission."
       : uploadsError === "missing_provider_token"
         ? signedIn
-          ? "Connect Google for YouTube — your session has no YouTube token yet."
-          : "Sign in with Google (YouTube scope) to search."
+          ? "You’re logged in — use “Allow YouTube access” in the header so your session gets a Google token."
+          : "Sign in with Google (YouTube) to search."
         : uploadsError;
 
   return (
@@ -74,7 +74,7 @@ export default async function DashboardPage({ searchParams }: Props) {
       suppressSidebarActive={isSearch}
       isAuthenticated={!!user}
     >
-      <main className="p-6 px-7 lg:p-7">
+      <main className="min-w-0 overflow-x-hidden p-6 px-7 lg:p-7">
         <YoutubeSyncHint
           needsYoutubeScope={needsYoutubeScope}
           youtubeError={youtubeError}
@@ -98,13 +98,13 @@ export default async function DashboardPage({ searchParams }: Props) {
               ? source === "youtube"
                 ? "YouTube search (opens the video page for transcript & analysis)"
                 : signedIn
-                  ? "Connect Google for YouTube to search — you’re signed in to VidSum."
+                  ? "You’re logged in — allow YouTube access in the header to search the real catalog."
                   : "Sample mode — sign in with Google (YouTube) to search"
               : source === "youtube" && resolvedId.startsWith("UC")
                 ? "Latest uploads from YouTube"
                 : signedIn
-                  ? "Sample catalog — connect Google for YouTube to see your real subscriptions."
-                  : "Sample catalog (sign in with Google for real subs)"}
+                  ? "Sample catalog — allow YouTube access in the header for real subscriptions."
+                  : "Sample catalog — sign in with Google (YouTube) for real subs"}
           </p>
         </header>
         {uploadsError ? (
@@ -113,9 +113,9 @@ export default async function DashboardPage({ searchParams }: Props) {
               ? `Search failed: ${searchErrorDetail}`
               : uploadsError === "missing_provider_token"
                 ? signedIn
-                  ? "You’re signed in — use Connect Google for YouTube (header) to load subscriptions and uploads."
-                  : "Sign in with Google (YouTube scope) to load subscriptions and uploads."
-                : "Could not load uploads. Re-sign in with Google or check API quota."}
+                  ? "You’re logged in — use “Allow YouTube access” in the header to load subscriptions and uploads."
+                  : "Sign in with Google (YouTube) to load subscriptions and uploads."
+                : "Could not load uploads. Refresh your Google session or check API quota."}
           </p>
         ) : null}
         {!isSearch && list.length === 0 && !uploadsError ? (

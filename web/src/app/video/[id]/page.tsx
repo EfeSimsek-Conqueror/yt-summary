@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { VideoDetail } from "@/components/video-detail";
+import { getResolvedGoogleAccessToken } from "@/lib/google/resolve-google-access-token";
 import { getChannelsForUser } from "@/lib/channels-for-user";
 import { createClient } from "@/lib/supabase/server";
 import { getVideo } from "@/lib/mock-data";
@@ -41,14 +42,11 @@ export default async function VideoPage({ params }: Props) {
     notFound();
   }
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
   let video: Video | undefined;
 
-  if (session?.provider_token) {
-    const fetched = await fetchVideoById(session.provider_token, id);
+  const accessToken = await getResolvedGoogleAccessToken();
+  if (accessToken) {
+    const fetched = await fetchVideoById(accessToken, id);
     if (fetched.ok) {
       video = fetched.video;
     }

@@ -1,3 +1,4 @@
+import { persistGoogleRefreshTokenIfPresent } from "@/lib/google/resolve-google-access-token";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
@@ -62,6 +63,10 @@ export async function handleOAuthCallback(request: NextRequest): Promise<NextRes
 
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      await persistGoogleRefreshTokenIfPresent(supabase, session);
       return NextResponse.redirect(`${origin}${next}`);
     }
   }

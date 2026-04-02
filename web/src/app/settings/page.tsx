@@ -1,3 +1,4 @@
+import { GoogleAccountAvatar } from "@/components/google-account-avatar";
 import { fetchAnalyzerRootHealth } from "@/lib/analyzer-api";
 import {
   getBillingSnapshot,
@@ -8,17 +9,6 @@ import { formatCreditsDisplay } from "@/lib/billing/video-credits";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { ArrowUpRight, Mail, Server, Sparkles, UserRound } from "lucide-react";
-
-function profileInitials(name: string | null, email: string): string {
-  if (name?.trim()) {
-    const parts = name.trim().split(/\s+/);
-    if (parts.length >= 2) {
-      return (parts[0]!.charAt(0) + parts[1]!.charAt(0)).toUpperCase();
-    }
-    return parts[0]!.slice(0, 2).toUpperCase();
-  }
-  return email.slice(0, 2).toUpperCase();
-}
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -49,18 +39,20 @@ export default async function SettingsPage() {
         })
       : null;
 
-  const initials =
-    user && email !== "—"
-      ? profileInitials(name, email)
-      : "?";
-
   return (
     <div className="space-y-8">
       <section className="overflow-hidden rounded-2xl border border-gray-700/50 bg-gradient-to-br from-gray-800/50 to-gray-900/70 p-6 shadow-xl shadow-black/40">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 text-2xl font-bold text-white shadow-lg shadow-purple-500/30">
-            {initials}
-          </div>
+          {user ? (
+            <GoogleAccountAvatar user={user} size="lg" />
+          ) : (
+            <div
+              className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 text-2xl font-bold text-white shadow-lg shadow-purple-500/30"
+              aria-hidden
+            >
+              ?
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold uppercase tracking-wide text-purple-300/90">
               Account

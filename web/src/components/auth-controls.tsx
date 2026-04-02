@@ -19,19 +19,27 @@ export function AuthControls() {
   useEffect(() => {
     const supabase = createClient();
 
+    async function syncYoutubeConnection() {
+      const r = await fetch("/api/me/youtube-token", {
+        credentials: "include",
+      });
+      const j = (await r.json().catch(() => ({}))) as {
+        connected?: boolean;
+      };
+      setHasYoutubeToken(Boolean(j.connected));
+    }
+
     supabase.auth.getUser().then(({ data: { user: u } }) => {
       setUser(u ?? null);
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setHasYoutubeToken(Boolean(session?.provider_token));
-    });
+    void syncYoutubeConnection();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      setHasYoutubeToken(Boolean(session?.provider_token));
+      void syncYoutubeConnection();
     });
 
     return () => subscription.unsubscribe();

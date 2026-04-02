@@ -1,3 +1,4 @@
+import { resolveGoogleAccessToken } from "@/lib/google/resolve-google-access-token";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
@@ -11,7 +12,7 @@ export async function GET() {
     data: { session },
   } = await supabase.auth.getSession();
 
-  const token = session?.provider_token;
+  const token = await resolveGoogleAccessToken(supabase, session);
   if (!token) {
     return NextResponse.json({ picture: null }, { status: 401 });
   }

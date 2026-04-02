@@ -107,7 +107,7 @@ export function VideoSearchBar({
     <form
       action="/dashboard"
       method="get"
-      className="mx-auto w-full max-w-4xl"
+      className="mx-auto w-full min-w-0 max-w-4xl"
       role="search"
       onSubmit={() => {
         setOpen(false);
@@ -202,8 +202,7 @@ export function VideoSearchBar({
         </div>
       ) : (
         <p className="mt-3 text-center text-sm text-gray-500">
-          Try pasting a YouTube link or search videos from your subscriptions
-          below
+          Paste a YouTube URL or type a search — results show in the grid below.
         </p>
       )}
     </form>

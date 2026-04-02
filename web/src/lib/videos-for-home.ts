@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getResolvedGoogleAccessToken } from "@/lib/google/resolve-google-access-token";
 import { getVideosForChannel } from "@/lib/mock-data";
 import type { Video } from "@/lib/types";
 import { fetchChannelUploads } from "@/lib/youtube/fetch-channel-uploads";
@@ -27,17 +27,13 @@ export async function getVideosForHome(
     return { videos: [] };
   }
 
-  const supabase = await createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session?.provider_token) {
+  const accessToken = await getResolvedGoogleAccessToken();
+  if (!accessToken) {
     return { videos: [], uploadsError: "missing_provider_token" };
   }
 
   const result = await fetchChannelUploads(
-    session.provider_token,
+    accessToken,
     channelId,
     24,
   );
@@ -71,17 +67,13 @@ export async function getVideosFromYoutubeSearch(
     };
   }
 
-  const supabase = await createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session?.provider_token) {
+  const accessToken = await getResolvedGoogleAccessToken();
+  if (!accessToken) {
     return { videos: [], uploadsError: "missing_provider_token" };
   }
 
   const result = await fetchYoutubeVideoSearch(
-    session.provider_token,
+    accessToken,
     q,
     20,
   );

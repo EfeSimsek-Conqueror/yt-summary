@@ -1,3 +1,5 @@
+import { formatYoutubeDataApiErrorBody } from "@/lib/youtube/format-api-error";
+
 export type YoutubeSubscriptionRow = {
   id: string;
   title: string;
@@ -35,7 +37,10 @@ export async function fetchYoutubeSubscriptions(
         const body = await res.text();
         return {
           ok: false,
-          error: body || res.statusText,
+          error: formatYoutubeDataApiErrorBody(
+            body || res.statusText,
+            res.status,
+          ),
           status: res.status,
         };
       }

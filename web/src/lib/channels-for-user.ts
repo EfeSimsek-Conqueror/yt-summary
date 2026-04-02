@@ -1,3 +1,4 @@
+import { getResolvedGoogleAccessToken } from "@/lib/google/resolve-google-access-token";
 import { createClient } from "@/lib/supabase/server";
 import { channels as mockChannels } from "@/lib/mock-data";
 import type { Channel } from "@/lib/types";
@@ -13,8 +14,8 @@ export type ChannelsForUserResult = {
 };
 
 /**
- * Resolves sidebar channels: real YouTube subs when session has provider_token
- * with youtube.readonly; otherwise mock list (or empty if YouTube returned []).
+ * Resolves sidebar channels: real YouTube subs when we have a Google access token
+ * (session.provider_token or refresh-token exchange); otherwise mock list.
  */
 export async function getChannelsForUser(): Promise<ChannelsForUserResult> {
   const supabase = await createClient();
@@ -26,7 +27,8 @@ export async function getChannelsForUser(): Promise<ChannelsForUserResult> {
     return { channels: mockChannels, source: "mock" };
   }
 
-  if (!session.provider_token) {
+  const accessToken = await getResolvedGoogleAccessToken();
+  if (!accessToken) {
     return {
       channels: mockChannels,
       source: "mock",
@@ -34,7 +36,7 @@ export async function getChannelsForUser(): Promise<ChannelsForUserResult> {
     };
   }
 
-  const result = await fetchYoutubeSubscriptions(session.provider_token);
+  const result = await fetchYoutubeSubscriptions(accessToken);
 
   if (!result.ok) {
     return {

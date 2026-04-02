@@ -38,14 +38,14 @@ export function AppShell({
 
   return (
     <GuestGateProvider value={showGuestGate}>
-      <div className="flex min-h-screen flex-col bg-black text-white">
+      <div className="flex min-h-screen min-w-0 flex-col overflow-x-hidden bg-black text-white">
         {!showGuestGate ? <TopNav /> : null}
-        <div className="relative flex min-h-0 flex-1">
+        <div className="relative flex min-h-0 min-w-0 flex-1 overflow-x-hidden">
           <div
             className={
               showGuestGate
-                ? "flex min-h-0 flex-1 blur-md saturate-50 pointer-events-none select-none"
-                : "flex min-h-0 flex-1"
+                ? "flex min-h-0 min-w-0 flex-1 blur-md saturate-50 pointer-events-none select-none"
+                : "flex min-h-0 min-w-0 flex-1"
             }
             aria-hidden={showGuestGate}
           >
@@ -60,8 +60,8 @@ export function AppShell({
             <div
               className={
                 mainOverflow === "hidden"
-                  ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-                  : "min-h-0 min-w-0 flex-1 overflow-auto"
+                  ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden overflow-x-hidden"
+                  : "min-h-0 min-w-0 flex-1 overflow-auto overflow-x-hidden"
               }
             >
               {children}

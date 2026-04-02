@@ -13,7 +13,7 @@ type Props = {
  * Required for `session.provider_token` used by YouTube Data API v3 (subs, search, uploads).
  */
 export function ConnectYoutubeCta({
-  label = "Connect Google for YouTube",
+  label = "Allow YouTube access",
   variant = "primary",
   className = "",
 }: Props) {

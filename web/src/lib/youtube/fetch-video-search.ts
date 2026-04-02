@@ -1,4 +1,5 @@
 import type { Video } from "@/lib/types";
+import { formatYoutubeDataApiErrorBody } from "@/lib/youtube/format-api-error";
 import { formatDurationLabel } from "@/lib/youtube/iso-duration";
 
 const YT = "https://www.googleapis.com/youtube/v3";
@@ -42,9 +43,10 @@ export async function fetchYoutubeVideoSearch(
       cache: "no-store",
     });
     if (!searchRes.ok) {
+      const raw = await searchRes.text();
       return {
         ok: false,
-        error: await searchRes.text(),
+        error: formatYoutubeDataApiErrorBody(raw, searchRes.status),
         status: searchRes.status,
       };
     }
@@ -105,9 +107,10 @@ export async function fetchYoutubeVideoSearch(
         cache: "no-store",
       });
       if (!vRes.ok) {
+        const raw = await vRes.text();
         return {
           ok: false,
-          error: await vRes.text(),
+          error: formatYoutubeDataApiErrorBody(raw, vRes.status),
           status: vRes.status,
         };
       }
