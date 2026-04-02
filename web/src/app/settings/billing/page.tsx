@@ -1,9 +1,10 @@
 import { BillingStripeActions } from "@/components/billing-stripe-actions";
-import { formatPlanPrice, PLANS, type PlanId } from "@/lib/billing/plans";
-import { effectivePlanIdFromSubscriptionRow } from "@/lib/billing/resolve-plan";
+import { getBillingSnapshot } from "@/lib/billing/settings-billing-snapshot";
+import { formatPlanPrice, PLANS } from "@/lib/billing/plans";
+import { formatCreditsDisplay } from "@/lib/billing/video-credits";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, CheckCircle2 } from "lucide-react";
 
 export default async function BillingPage() {
   const supabase = await createClient();
@@ -11,107 +12,93 @@ export default async function BillingPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  let creditsRemaining = PLANS.scout.creditsIncluded;
-  let effectivePlanId: PlanId = "scout";
-  let hasStripeCustomer = false;
-
-  if (user) {
-    const { data: creditRow } = await supabase
-      .from("user_credits")
-      .select("credits_remaining")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (creditRow) creditsRemaining = Number(creditRow.credits_remaining);
-
-    const { data: subRow } = await supabase
-      .from("billing_subscriptions")
-      .select("plan_id, status")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    effectivePlanId = effectivePlanIdFromSubscriptionRow(
-      subRow
-        ? {
-            plan_id: subRow.plan_id as string,
-            status: subRow.status as string,
-          }
-        : null,
-    );
-
-    const { data: custRow } = await supabase
-      .from("stripe_customers")
-      .select("stripe_customer_id")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    hasStripeCustomer = Boolean(custRow?.stripe_customer_id);
-  }
-
-  const plan = PLANS[effectivePlanId];
+  const snapshot = await getBillingSnapshot(supabase, user?.id ?? null);
+  const plan = PLANS[snapshot.effectivePlanId];
   const creditsDetail =
     plan.creditsPeriod === "once"
-      ? `${creditsRemaining} credits included with ${plan.shortName}`
-      : `${creditsRemaining} credits this billing period`;
+      ? `${formatCreditsDisplay(snapshot.creditsRemaining)} credits included with ${plan.shortName}`
+      : `${formatCreditsDisplay(snapshot.creditsRemaining)} credits this billing period`;
 
-  const stripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY?.trim());
+  const periodEnd =
+    snapshot.currentPeriodEnd &&
+    (snapshot.subscriptionStatus === "active" ||
+      snapshot.subscriptionStatus === "trialing")
+      ? new Date(snapshot.currentPeriodEnd).toLocaleDateString(undefined, {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })
+      : null;
 
   return (
-    <main className="p-6 px-7 lg:p-7">
-      <header className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight text-white">
-          Billing & plan
-        </h1>
-        <p className="mt-1 text-sm text-muted">
-          Your current tier and usage. Paid plans bill through Stripe.
+    <div className="space-y-8">
+      <header>
+        <p className="text-xs font-semibold uppercase tracking-wide text-purple-300/80">
+          Plan & billing
+        </p>
+        <p className="mt-1 text-sm text-gray-400">
+          Your tier, credits, and Stripe checkout or customer portal.
         </p>
       </header>
 
-      <section className="max-w-lg space-y-4">
-        <div className="rounded-xl border border-gray-800 bg-zinc-950/80 p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                Current plan
-              </p>
-              <p className="mt-1 text-lg font-semibold text-white">
-                {plan.displayName}
-              </p>
-              <p className="mt-1 text-sm text-muted">{creditsDetail}</p>
-              <p className="mt-2 text-sm font-medium text-white">
-                {formatPlanPrice(plan)}
-              </p>
+      <section className="overflow-hidden rounded-2xl border border-purple-500/40 bg-gradient-to-br from-purple-600/25 via-gray-900/50 to-pink-900/20 p-6 shadow-xl shadow-purple-900/40 md:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+              Current plan
+            </p>
+            <p className="mt-2 text-2xl font-bold text-white md:text-3xl">
+              {plan.displayName}
+            </p>
+            <p className="mt-2 text-sm text-gray-300">{creditsDetail}</p>
+            {periodEnd ? (
               <p className="mt-2 text-xs text-gray-500">
-                Usage: 1 credit per 3 minutes of analyzed video (proportional to
-                length).
+                Billing period ends{" "}
+                <span className="text-gray-300">{periodEnd}</span>
               </p>
-            </div>
-            <span className="inline-flex rounded-md border border-purple-500/35 bg-purple-500/15 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-purple-200">
-              {plan.shortName}
-            </span>
+            ) : null}
+            <p className="mt-4 text-lg font-semibold text-white">
+              {formatPlanPrice(plan)}
+            </p>
           </div>
+          <span className="inline-flex rounded-lg border border-purple-500/45 bg-purple-500/20 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-purple-100">
+            {plan.shortName}
+          </span>
         </div>
 
-        {user && stripeConfigured ? (
-          <div className="rounded-xl border border-gray-800 bg-zinc-950/80 p-5">
-            <BillingStripeActions
-              planId={effectivePlanId}
-              hasStripeCustomer={hasStripeCustomer}
-            />
-          </div>
-        ) : user && !stripeConfigured ? (
-          <p className="text-sm text-gray-500">
-            Stripe is not configured on this deployment — paid checkout is
-            unavailable.
-          </p>
-        ) : null}
-
-        <Link
-          href="/#pricing"
-          className="flex items-center justify-between gap-3 rounded-xl border border-gray-800 bg-zinc-900/50 px-4 py-3 text-sm text-white transition hover:border-gray-700 hover:bg-zinc-900"
-        >
-          <span>View plans & pricing</span>
-          <ArrowUpRight className="h-4 w-4 shrink-0 text-gray-400" />
-        </Link>
+        <ul className="mt-6 space-y-2 border-t border-white/10 pt-6 text-sm text-gray-300">
+          <li className="flex items-start gap-2">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+            Usage: 1 credit per 3 minutes of analyzed video (scaled to length).
+          </li>
+          <li className="flex items-start gap-2">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+            Upgrade or manage payment methods in Stripe when you subscribe.
+          </li>
+        </ul>
       </section>
-    </main>
+
+      {user && snapshot.stripeConfigured ? (
+        <section className="rounded-2xl border border-gray-700/50 bg-gradient-to-br from-gray-800/40 to-gray-950/80 p-6">
+          <BillingStripeActions
+            planId={snapshot.effectivePlanId}
+            hasStripeCustomer={snapshot.hasStripeCustomer}
+          />
+        </section>
+      ) : user && !snapshot.stripeConfigured ? (
+        <p className="text-sm text-gray-500">
+          Stripe is not configured on this deployment — paid checkout is
+          unavailable.
+        </p>
+      ) : null}
+
+      <Link
+        href="/#pricing"
+        className="flex items-center justify-between gap-3 rounded-2xl border border-gray-700/50 bg-gradient-to-r from-gray-900/80 to-zinc-900/50 px-5 py-4 text-sm font-medium text-white transition hover:border-purple-500/40 hover:from-purple-950/40 hover:to-pink-950/30"
+      >
+        <span>Compare plans on the landing page</span>
+        <ArrowUpRight className="h-4 w-4 shrink-0 text-gray-400" />
+      </Link>
+    </div>
   );
 }

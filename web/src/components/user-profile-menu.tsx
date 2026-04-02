@@ -309,7 +309,7 @@ export function UserProfileMenu({ user, onSignOut }: Props) {
               onClick={() => setOpen(false)}
             >
               <CreditCard className="h-4 w-4 shrink-0 text-gray-500" />
-              Billing & plan
+              Plan & billing
             </Link>
           </div>
 

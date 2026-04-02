@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app-shell";
+import { SettingsShell } from "@/components/settings/settings-shell";
 import { getChannelsForUser } from "@/lib/channels-for-user";
 import { createClient } from "@/lib/supabase/server";
 
@@ -20,7 +21,7 @@ export default async function SettingsLayout({
       activeChannelId={activeChannelId}
       isAuthenticated={!!user}
     >
-      {children}
+      <SettingsShell>{children}</SettingsShell>
     </AppShell>
   );
 }

@@ -13,7 +13,18 @@ import Stripe from "stripe";
 const key = process.env.STRIPE_SECRET_KEY?.trim();
 if (!key) {
   console.error(
-    "STRIPE_SECRET_KEY yok. Örnek: node --env-file=.env.local ./scripts/stripe-list-prices.mjs",
+    [
+      "STRIPE_SECRET_KEY tanımlı değil.",
+      "",
+      "1) Stripe Dashboard → Developers → API keys → Secret key kopyala",
+      "2) web/.env.local içine ekle (tek satır):",
+      "   STRIPE_SECRET_KEY=sk_test_...   veya   sk_live_...",
+      "3) Tekrar çalıştır:",
+      "   node --env-file=.env.local ./scripts/stripe-list-prices.mjs",
+      "",
+      "Alternatif (tek seferlik):",
+      "   STRIPE_SECRET_KEY=sk_test_... npm run stripe:prices",
+    ].join("\n"),
   );
   process.exit(1);
 }
