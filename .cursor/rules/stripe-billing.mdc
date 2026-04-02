@@ -1,0 +1,10 @@
+---
+description: Stripe billing vs Cursor Stripe MCP — VidSum
+alwaysApply: false
+---
+
+- **Runtime (VidSum):** Stripe is integrated in `web/` via the official `stripe` Node SDK — `getStripe()` in `web/src/lib/billing/stripe-server.ts`, routes under `web/src/app/api/billing/*` and `web/src/app/api/webhooks/stripe/route.ts`. Production and Railway use **server-only** env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID_*`, `SUPABASE_SERVICE_ROLE_KEY`.
+
+- **Cursor Stripe MCP:** Runs only inside the IDE for the AI assistant. It is **not** callable from Next.js or user browsers. Use the **same** Stripe restricted/secret key as `STRIPE_SECRET_KEY` so Dashboard, MCP, and the app stay in sync.
+
+- **List Price IDs locally:** From `web/`, run `npm run stripe:prices` with `STRIPE_SECRET_KEY` set (or `node --env-file=.env.local ./scripts/stripe-list-prices.mjs`).

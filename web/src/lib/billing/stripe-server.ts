@@ -1,3 +1,8 @@
+/**
+ * Üretim Stripe erişimi (Checkout, Portal, webhooks). Cursor’daki Stripe MCP
+ * aynı Stripe hesabını kullanır; MCP yalnızca IDE’de — runtime burayı çağıramaz.
+ * Fiyat ID’leri: `cd web && npm run stripe:prices` (STRIPE_SECRET_KEY gerekli).
+ */
 import Stripe from "stripe";
 
 let stripeSingleton: Stripe | null = null;
