@@ -1,4 +1,6 @@
+import { vidError, vidLog } from "@/lib/server/vid-log";
 import { createClient } from "@/lib/supabase/server";
+import { getServerAuthUser } from "@/lib/supabase/server-auth";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { cache } from "react";
 
@@ -10,7 +12,7 @@ export async function persistGoogleRefreshTokenIfPresent(
   session: Session | null,
 ): Promise<void> {
   if (!session?.user?.id || !session.provider_refresh_token) return;
-  await supabase.from(TABLE).upsert(
+  const { error } = await supabase.from(TABLE).upsert(
     {
       user_id: session.user.id,
       refresh_token: session.provider_refresh_token,
@@ -18,6 +20,16 @@ export async function persistGoogleRefreshTokenIfPresent(
     },
     { onConflict: "user_id" },
   );
+  if (error) {
+    vidError("google-token", "failed to persist refresh token row", {
+      message: error.message,
+      code: error.code,
+    });
+  } else {
+    vidLog("google-token", "stored refresh token for user", {
+      userId: session.user.id,
+    });
+  }
 }
 
 function googleOAuthClientCredentials(): { id: string; secret: string } | null {
@@ -53,10 +65,27 @@ export async function resolveGoogleAccessToken(
   const storedRefresh = row?.refresh_token as string | undefined;
   const refreshToken =
     session.provider_refresh_token ?? storedRefresh ?? null;
-  if (!refreshToken) return null;
+  if (!refreshToken) {
+    vidLog("google-token", "no refresh token available", {
+      userId: session.user.id,
+      hasSessionRefresh: Boolean(session.provider_refresh_token),
+      hasStoredRefresh: Boolean(storedRefresh),
+    });
+    return null;
+  }
 
   const creds = googleOAuthClientCredentials();
-  if (!creds) return null;
+  if (!creds) {
+    vidError("google-token", "missing GOOGLE_OAUTH_CLIENT_ID/SECRET for refresh", {
+      userId: session.user.id,
+    });
+    return null;
+  }
+
+  vidLog("google-token", "refreshing access token via Google OAuth", {
+    userId: session.user.id,
+    usedStoredRow: Boolean(storedRefresh),
+  });
 
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -75,8 +104,16 @@ export async function resolveGoogleAccessToken(
   };
 
   if (!res.ok || !json.access_token) {
+    vidError("google-token", "Google token endpoint failed", {
+      userId: session.user.id,
+      httpStatus: res.status,
+      error: json.error ?? null,
+    });
     if (json.error === "invalid_grant") {
       await supabase.from(TABLE).delete().eq("user_id", session.user.id);
+      vidLog("google-token", "cleared stored refresh after invalid_grant", {
+        userId: session.user.id,
+      });
     }
     return null;
   }
@@ -101,6 +138,8 @@ export async function resolveGoogleAccessToken(
 export const getResolvedGoogleAccessToken = cache(
   async (): Promise<string | null> => {
     const supabase = await createClient();
+    const { data: { user }, error } = await getServerAuthUser();
+    if (error || !user) return null;
     const {
       data: { session },
     } = await supabase.auth.getSession();

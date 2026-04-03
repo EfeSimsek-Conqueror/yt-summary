@@ -14,6 +14,8 @@ async function fetchPictureWithProviderToken(
   signal: AbortSignal,
 ): Promise<string | null> {
   const supabase = createClient();
+  const { data: userData, error } = await supabase.auth.getUser();
+  if (error || !userData.user) return null;
   const {
     data: { session },
   } = await supabase.auth.getSession();

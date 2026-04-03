@@ -8,6 +8,10 @@ import { NextResponse } from "next/server";
  */
 export async function GET() {
   const supabase = await createClient();
+  const { data: userData, error } = await supabase.auth.getUser();
+  if (error || !userData.user) {
+    return NextResponse.json({ picture: null }, { status: 401 });
+  }
   const {
     data: { session },
   } = await supabase.auth.getSession();

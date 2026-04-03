@@ -35,9 +35,8 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  // Refresh session cookies (JWT). Supabase often omits provider_token after refresh; the app
-  // stores Google refresh tokens in DB and re-issues access tokens server-side.
-  await supabase.auth.getSession();
+  // Validate session with Auth server (not only cookie JWT); refreshes cookies as needed.
+  await supabase.auth.getUser();
 
   return supabaseResponse;
 }

@@ -12,6 +12,8 @@ import {
 } from "@/lib/videos-for-home";
 import { redirect } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 type Props = {
   searchParams: Promise<{ channel?: string; q?: string }>;
 };
@@ -66,8 +68,8 @@ export default async function DashboardPage({ searchParams }: Props) {
       : uploadsError === "missing_provider_token"
         ? signedIn
           ? hasGoogleIdentity
-            ? "Grant YouTube access once — your Google sign-in doesn’t include YouTube’s API by itself."
-            : "Use “Allow YouTube access” in the header to link Google."
+            ? "Use the banner button once — YouTube access is separate from sign-in."
+            : "Use Grant YouTube access in the banner to link Google."
           : "Sign in with Google (YouTube) to search."
         : uploadsError;
 

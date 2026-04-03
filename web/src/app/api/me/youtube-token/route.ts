@@ -8,13 +8,13 @@ import { NextResponse } from "next/server";
  */
 export async function GET() {
   const supabase = await createClient();
+  const { data: userData, error } = await supabase.auth.getUser();
+  if (error || !userData.user) {
+    return NextResponse.json({ connected: false });
+  }
   const {
     data: { session },
   } = await supabase.auth.getSession();
-
-  if (!session?.user) {
-    return NextResponse.json({ connected: false });
-  }
 
   const token = await resolveGoogleAccessToken(supabase, session);
   return NextResponse.json({ connected: Boolean(token) });

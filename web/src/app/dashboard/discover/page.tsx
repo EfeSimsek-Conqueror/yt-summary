@@ -15,6 +15,8 @@ import { getVideosFromYoutubeSearch } from "@/lib/videos-for-home";
 import type { Video } from "@/lib/types";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 const VIDEOS_PER_ROW = 12;
 
 export default async function DiscoverPage() {
@@ -76,13 +78,13 @@ export default async function DiscoverPage() {
   const searchErrorDetail =
     firstError === "search_requires_youtube"
       ? signedIn
-        ? "You’re logged in — allow YouTube access (banner above) to use real search instead of the sample catalog."
+        ? "Use Grant YouTube access above for live Discover (not samples)."
         : "Sign in with Google (YouTube) to load Discover."
       : firstError === "missing_provider_token"
         ? signedIn
           ? hasGoogleIdentity
-            ? "Grant YouTube access once — Google sign-in alone doesn’t turn on YouTube’s API for subs/search."
-            : "Use “Allow YouTube access” in the banner to link Google for YouTube Data API."
+            ? "Use the banner button once — YouTube access is separate from sign-in."
+            : "Use Grant YouTube access in the banner to link Google."
           : "Sign in with Google (YouTube) for Discover."
         : sanitizeYoutubeErrorForUi(firstError ?? "");
 
@@ -91,8 +93,8 @@ export default async function DiscoverPage() {
     if (uploadsError === "missing_provider_token") {
       if (!signedIn) return "Sign in with Google (YouTube) for Discover.";
       return hasGoogleIdentity
-        ? "Grant YouTube access once — Google sign-in alone doesn’t enable YouTube’s API here."
-        : "Use “Allow YouTube access” in the banner to link Google.";
+        ? "Use the banner button once — YouTube access is separate from sign-in."
+        : "Use Grant YouTube access in the banner to link Google.";
     }
     return sanitizeYoutubeErrorForUi(uploadsError);
   };
@@ -139,16 +141,17 @@ export default async function DiscoverPage() {
         ) : null}
 
         {useQuotaFallback ? (
-          <p className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/95">
-            YouTube Data API daily quota is used up — showing sample videos below.
-            To load live search again, wait for the quota reset or increase it in{" "}
+          <p className="mb-4 rounded-lg border border-zinc-600/60 bg-zinc-900/50 px-4 py-2.5 text-sm leading-relaxed text-zinc-400">
+            <span className="text-zinc-300">Preview mode:</span> this project’s
+            YouTube API quota is used up for now, so below are sample videos. Live
+            search comes back after the daily reset, or when the limit is raised in{" "}
             <a
               href="https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas"
-              className="font-medium text-amber-200 underline underline-offset-2 hover:text-white"
+              className="font-medium text-zinc-300 underline underline-offset-2 hover:text-white"
               target="_blank"
               rel="noreferrer"
             >
-              Google Cloud Console
+              Google Cloud
             </a>
             .
           </p>

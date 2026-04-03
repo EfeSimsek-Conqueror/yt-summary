@@ -29,45 +29,42 @@ export function YoutubeSyncHint({
   if (needsYoutubeScope) {
     if (isSignedIn) {
       const title = hasGoogleIdentity
-        ? "YouTube data isn’t enabled yet"
+        ? "Allow YouTube for subscriptions & search"
         : "Connect Google for YouTube";
       const body = hasGoogleIdentity ? (
         <>
-          Signing in with Google only proves your account. Reading subscriptions
-          and search uses{" "}
-          <strong className="font-medium text-amber-50/95">YouTube’s API</strong>
-          , which Google keeps separate from basic login—so you approve{" "}
-          <span className="whitespace-nowrap">read-only</span> access once. Same
-          Google account; not a second sign-in.
+          Subscriptions and search need the YouTube Data API. Tap{" "}
+          <span className="font-medium text-zinc-200">Grant YouTube access</span>{" "}
+          below for a one-time, read-only Google permission (same account as
+          sign-in).
         </>
       ) : (
         <>
-          VidSum needs a Google account with permission to talk to YouTube’s
-          servers for subs and search. Use the button to link Google with the
-          right access.
+          Link Google with YouTube access so VidSum can load subscriptions and
+          search from YouTube’s servers.
         </>
       );
       return (
         <div
-          className="mb-6 flex flex-col gap-3 rounded-xl border border-amber-500/30 bg-amber-950/25 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+          className="mb-6 flex flex-col gap-3 rounded-xl border border-zinc-700/70 bg-gradient-to-br from-zinc-900/95 to-zinc-950/95 px-4 py-3.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] ring-1 ring-white/[0.06] sm:flex-row sm:items-center sm:justify-between sm:gap-4"
           role="region"
           aria-labelledby="yt-connect-title"
         >
           <div className="flex min-w-0 items-start gap-3">
             <div
-              className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-600/30"
+              className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-800/90 ring-1 ring-zinc-600/50"
               aria-hidden
             >
-              <Youtube className="h-5 w-5 text-red-200" />
+              <Youtube className="h-5 w-5 text-red-500" />
             </div>
             <div className="min-w-0">
               <h2
                 id="yt-connect-title"
-                className="text-sm font-semibold text-white"
+                className="text-sm font-semibold tracking-tight text-zinc-50"
               >
                 {title}
               </h2>
-              <p className="mt-1 text-xs leading-relaxed text-amber-100/85 sm:text-sm">
+              <p className="mt-1 text-xs leading-relaxed text-zinc-400 sm:text-[13px] sm:leading-snug">
                 {body}
               </p>
             </div>

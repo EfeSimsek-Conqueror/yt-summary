@@ -1,5 +1,6 @@
 import { getResolvedGoogleAccessToken } from "@/lib/google/resolve-google-access-token";
-import { createClient } from "@/lib/supabase/server";
+import { vidError, vidLog } from "@/lib/server/vid-log";
+import { getServerAuthUser } from "@/lib/supabase/server-auth";
 import { channels as mockChannels } from "@/lib/mock-data";
 import type { Channel } from "@/lib/types";
 import { fetchYoutubeSubscriptions } from "@/lib/youtube/fetch-subscriptions";
@@ -18,17 +19,21 @@ export type ChannelsForUserResult = {
  * (session.provider_token or refresh-token exchange); otherwise mock list.
  */
 export async function getChannelsForUser(): Promise<ChannelsForUserResult> {
-  const supabase = await createClient();
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+    error: authError,
+  } = await getServerAuthUser();
 
-  if (!session?.user) {
+  if (authError || !user) {
+    vidLog("channels", "anonymous session — mock channels");
     return { channels: mockChannels, source: "mock" };
   }
 
   const accessToken = await getResolvedGoogleAccessToken();
   if (!accessToken) {
+    vidLog("channels", "no Google access token — needs YouTube OAuth / linking", {
+      userId: user.id,
+    });
     return {
       channels: mockChannels,
       source: "mock",
@@ -39,6 +44,12 @@ export async function getChannelsForUser(): Promise<ChannelsForUserResult> {
   const result = await fetchYoutubeSubscriptions(accessToken);
 
   if (!result.ok) {
+    vidError("channels", "YouTube subscriptions API failed", {
+      userId: user.id,
+      status: result.status,
+      errorPreview: result.error?.slice(0, 200) ?? null,
+      needsScopeHint: result.status === 401 || result.status === 403,
+    });
     return {
       channels: mockChannels,
       source: "mock",
@@ -48,8 +59,16 @@ export async function getChannelsForUser(): Promise<ChannelsForUserResult> {
   }
 
   if (result.channels.length === 0) {
+    vidLog("channels", "YouTube returned zero subscriptions", {
+      userId: user.id,
+    });
     return { channels: [], source: "youtube" };
   }
+
+  vidLog("channels", "loaded YouTube subscriptions", {
+    userId: user.id,
+    count: result.channels.length,
+  });
 
   return {
     channels: result.channels.map((c) => ({
