@@ -2,6 +2,7 @@
 
 import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { parsePlaylistId } from "@/lib/youtube/video-id";
 import {
   useCallback,
   useEffect,
@@ -69,6 +70,15 @@ export function VideoSearchBar({
   function goSearch(q: string) {
     const next = q.trim();
     if (!next) return;
+
+    const playlistId = parsePlaylistId(next);
+    if (playlistId) {
+      router.push(`/dashboard?playlist=${encodeURIComponent(playlistId)}`);
+      setOpen(false);
+      setActiveIdx(-1);
+      return;
+    }
+
     const params = new URLSearchParams();
     if (channelContextId && channelContextId.startsWith("UC")) {
       params.set("channel", channelContextId);

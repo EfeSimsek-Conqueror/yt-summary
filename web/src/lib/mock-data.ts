@@ -14,6 +14,7 @@ export const videos: Video[] = [
     channelId: "c1",
     title: "100 JavaScript concepts you need to know",
     durationLabel: "8:42",
+    publishedAt: "2025-11-15T16:00:00Z",
     summaryShort:
       "Fast tour of core JS ideas from closures to event loop—good refresher before interviews.",
     transcriptPreview:
@@ -66,6 +67,7 @@ export const videos: Video[] = [
     channelId: "c1",
     title: "How I would learn to code in 2025",
     durationLabel: "12:05",
+    publishedAt: "2025-09-22T14:30:00Z",
     summaryShort:
       "Suggests a practical stack, projects-first path, and avoiding tutorial overload.",
     transcriptPreview:
@@ -83,6 +85,7 @@ export const videos: Video[] = [
     channelId: "c1",
     title: "The problem with Next.js",
     durationLabel: "6:18",
+    publishedAt: "2025-08-10T10:00:00Z",
     summaryShort:
       "Tradeoffs of the App Router, caching surprises, and when simpler tools win.",
     transcriptPreview:
@@ -100,6 +103,7 @@ export const videos: Video[] = [
     channelId: "c1",
     title: "Postgres in 100 seconds",
     durationLabel: "15:22",
+    publishedAt: "2025-06-05T12:00:00Z",
     summaryShort:
       "CRUD, indexes, and why relational beats NoSQL for many app backends.",
     transcriptPreview:
@@ -113,6 +117,7 @@ export const videos: Video[] = [
     channelId: "c1",
     title: "Docker in 100 seconds",
     durationLabel: "9:01",
+    publishedAt: "2025-04-18T08:00:00Z",
     summaryShort:
       "Images vs containers, Dockerfile basics, and compose for local dev stacks.",
     transcriptPreview:
@@ -126,6 +131,7 @@ export const videos: Video[] = [
     channelId: "c1",
     title: "Git in 100 seconds",
     durationLabel: "4:55",
+    publishedAt: "2025-02-01T18:00:00Z",
     summaryShort:
       "Staging, commits, branches, merge vs rebase—minimum viable Git mental model.",
     transcriptPreview:

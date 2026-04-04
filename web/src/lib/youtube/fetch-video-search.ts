@@ -73,6 +73,7 @@ export async function fetchYoutubeVideoSearch(
         channelId: string;
         channelTitle?: string;
         thumb?: string;
+        publishedAt?: string;
       }
     >();
 
@@ -88,6 +89,7 @@ export async function fetchYoutubeVideoSearch(
         channelTitle: sn?.channelTitle,
         thumb:
           sn?.thumbnails?.high?.url ?? sn?.thumbnails?.medium?.url,
+        publishedAt: (sn as { publishedAt?: string } | undefined)?.publishedAt,
       });
     }
 
@@ -118,7 +120,7 @@ export async function fetchYoutubeVideoSearch(
         items?: Array<{
           id?: string;
           contentDetails?: { duration?: string };
-          snippet?: { title?: string; description?: string };
+          snippet?: { title?: string; description?: string; publishedAt?: string };
         }>;
       };
 
@@ -147,6 +149,7 @@ export async function fetchYoutubeVideoSearch(
           segments: [],
           thumbnailUrl: meta?.thumb,
           channelTitle: meta?.channelTitle,
+          publishedAt: item.snippet?.publishedAt ?? meta?.publishedAt,
         });
       }
     }

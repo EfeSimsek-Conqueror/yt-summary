@@ -2,6 +2,7 @@ import { AppShell } from "@/components/app-shell";
 import { VideoCard } from "@/components/video-card";
 import { VideoSearchBar } from "@/components/video-search-bar";
 import { YoutubeSyncHint } from "@/components/youtube-sync-hint";
+import { PlaylistGridView } from "@/components/playlist/playlist-grid-view";
 import { userHasGoogleIdentity } from "@/lib/auth/google-identity";
 import { getChannelsForUser } from "@/lib/channels-for-user";
 import { getChannel } from "@/lib/mock-data";
@@ -15,18 +16,20 @@ import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 
 type Props = {
-  searchParams: Promise<{ channel?: string; q?: string }>;
+  searchParams: Promise<{ channel?: string; q?: string; playlist?: string }>;
 };
 
 export default async function DashboardPage({ searchParams }: Props) {
-  const { channel: channelParam, q: qParam } = await searchParams;
+  const { channel: channelParam, q: qParam, playlist: playlistParam } = await searchParams;
+  const playlistId =
+    typeof playlistParam === "string" ? playlistParam.trim() : "";
   const searchQuery =
     typeof qParam === "string" ? qParam.trim() : "";
   const isSearch = searchQuery.length > 0;
   const channelId =
     typeof channelParam === "string" ? channelParam.trim() : "";
 
-  if (!channelId && !isSearch) {
+  if (!channelId && !isSearch && !playlistId) {
     redirect("/dashboard/discover");
   }
 
@@ -48,6 +51,24 @@ export default async function DashboardPage({ searchParams }: Props) {
         ? channelId
         : channels[0]!.id
       : "c1";
+
+  if (playlistId) {
+    return (
+      <AppShell
+        channels={channels}
+        activeChannelId={resolvedId}
+        suppressSidebarActive
+        isAuthenticated={!!user}
+      >
+        <main className="min-w-0 overflow-x-hidden p-6 px-7 lg:p-7">
+          <div className="mb-8">
+            <VideoSearchBar defaultQuery="" />
+          </div>
+          <PlaylistGridView playlistId={playlistId} />
+        </main>
+      </AppShell>
+    );
+  }
 
   const channel = getChannel(resolvedId) ?? {
     id: resolvedId,

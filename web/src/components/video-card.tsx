@@ -2,6 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { Play } from "lucide-react";
 import type { Video } from "@/lib/types";
+import { formatRelativeDate } from "@/lib/format-relative-date";
+import { AddToPlaylistButton } from "@/components/playlist/add-to-playlist-dropdown";
 
 const thumbGradients = [
   "from-slate-600 to-slate-900",
@@ -43,6 +45,7 @@ export function VideoCard({ video }: Props) {
               sizes="(max-width: 768px) 100vw, 33vw"
             />
           ) : null}
+          <AddToPlaylistButton video={video} />
           <span className="absolute bottom-2 right-2 z-10 rounded bg-black/80 px-2 py-0.5 text-xs font-semibold text-white backdrop-blur-sm">
             {video.durationLabel}
           </span>
@@ -56,9 +59,11 @@ export function VideoCard({ video }: Props) {
           <h2 className="mb-2 line-clamp-2 text-sm font-semibold leading-snug text-white group-hover:text-blue-400">
             {video.title}
           </h2>
-          {video.channelTitle ? (
+          {video.channelTitle || video.publishedAt ? (
             <p className="mb-1.5 text-[11px] font-medium text-muted">
               {video.channelTitle}
+              {video.channelTitle && video.publishedAt ? " · " : ""}
+              {video.publishedAt ? formatRelativeDate(video.publishedAt) : ""}
             </p>
           ) : null}
           <p className="line-clamp-2 text-xs leading-relaxed text-muted">

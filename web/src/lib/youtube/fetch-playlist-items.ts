@@ -4,49 +4,22 @@ import { formatDurationLabel } from "@/lib/youtube/iso-duration";
 
 const YT = "https://www.googleapis.com/youtube/v3";
 
-export type FetchUploadsResult =
-  | { ok: true; videos: Video[] }
+export type FetchPlaylistResult =
+  | { ok: true; videos: Video[]; playlistTitle?: string }
   | { ok: false; error: string; status: number };
 
 /**
- * Latest uploads for a channel: channels.list → uploads playlist → playlistItems → videos.list (durations).
+ * Fetch all videos in a YouTube playlist (playlistItems.list + videos.list for durations).
  */
-export async function fetchChannelUploads(
+export async function fetchPlaylistItems(
   accessToken: string,
-  channelId: string,
-  maxResults = 24,
-): Promise<FetchUploadsResult> {
+  playlistId: string,
+  maxResults = 50,
+): Promise<FetchPlaylistResult> {
   try {
-    const chUrl = new URL(`${YT}/channels`);
-    chUrl.searchParams.set("part", "contentDetails");
-    chUrl.searchParams.set("id", channelId);
-
-    const chRes = await fetch(chUrl.toString(), {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      cache: "no-store",
-    });
-    if (!chRes.ok) {
-      const raw = await chRes.text();
-      return {
-        ok: false,
-        error: formatYoutubeDataApiErrorBody(raw, chRes.status),
-        status: chRes.status,
-      };
-    }
-    const chJson = (await chRes.json()) as {
-      items?: Array<{
-        contentDetails?: { relatedPlaylists?: { uploads?: string } };
-      }>;
-    };
-    const uploadsPlaylistId =
-      chJson.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
-    if (!uploadsPlaylistId) {
-      return { ok: true, videos: [] };
-    }
-
     const plUrl = new URL(`${YT}/playlistItems`);
     plUrl.searchParams.set("part", "snippet,contentDetails");
-    plUrl.searchParams.set("playlistId", uploadsPlaylistId);
+    plUrl.searchParams.set("playlistId", playlistId);
     plUrl.searchParams.set("maxResults", String(Math.min(maxResults, 50)));
 
     const plRes = await fetch(plUrl.toString(), {
@@ -61,12 +34,14 @@ export async function fetchChannelUploads(
         status: plRes.status,
       };
     }
+
     const plJson = (await plRes.json()) as {
       items?: Array<{
         snippet?: {
           title?: string;
           description?: string;
           publishedAt?: string;
+          channelTitle?: string;
           thumbnails?: { high?: { url?: string }; medium?: { url?: string } };
           resourceId?: { videoId?: string };
         };
@@ -76,7 +51,13 @@ export async function fetchChannelUploads(
     const ids: string[] = [];
     const snippetById = new Map<
       string,
-      { title: string; description: string; thumb?: string; publishedAt?: string }
+      {
+        title: string;
+        description: string;
+        thumb?: string;
+        channelTitle?: string;
+        publishedAt?: string;
+      }
     >();
 
     for (const row of plJson.items ?? []) {
@@ -89,6 +70,7 @@ export async function fetchChannelUploads(
         thumb:
           row.snippet?.thumbnails?.high?.url ??
           row.snippet?.thumbnails?.medium?.url,
+        channelTitle: row.snippet?.channelTitle,
         publishedAt: row.snippet?.publishedAt,
       });
     }
@@ -120,7 +102,13 @@ export async function fetchChannelUploads(
         items?: Array<{
           id?: string;
           contentDetails?: { duration?: string };
-          snippet?: { title?: string; description?: string; publishedAt?: string };
+          snippet?: {
+            title?: string;
+            description?: string;
+            channelId?: string;
+            channelTitle?: string;
+            publishedAt?: string;
+          };
         }>;
       };
 
@@ -128,10 +116,8 @@ export async function fetchChannelUploads(
         const vid = item.id;
         if (!vid) continue;
         const sn = snippetById.get(vid);
-        const title =
-          item.snippet?.title ?? sn?.title ?? "Untitled";
-        const desc =
-          item.snippet?.description ?? sn?.description ?? "";
+        const title = item.snippet?.title ?? sn?.title ?? "Untitled";
+        const desc = item.snippet?.description ?? sn?.description ?? "";
         const durationIso = item.contentDetails?.duration ?? "PT0S";
         const summary =
           desc.trim().slice(0, 160) ||
@@ -139,7 +125,8 @@ export async function fetchChannelUploads(
 
         videos.push({
           id: vid,
-          channelId,
+          channelId: item.snippet?.channelId ?? "",
+          channelTitle: item.snippet?.channelTitle ?? sn?.channelTitle,
           title,
           durationLabel: formatDurationLabel(durationIso),
           summaryShort: summary,

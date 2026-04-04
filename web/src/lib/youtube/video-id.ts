@@ -22,6 +22,17 @@ export function parseYoutubeVideoId(input: string): string | null {
   return null;
 }
 
+/**
+ * Extract a YouTube playlist ID from various URL formats.
+ * - youtube.com/playlist?list=PLxxx
+ * - youtube.com/watch?v=xxx&list=PLxxx
+ */
+export function parsePlaylistId(input: string): string | null {
+  const t = input.trim();
+  const m = t.match(/[?&]list=([\w-]+)/);
+  return m?.[1] ?? null;
+}
+
 /** Canonical watch URL for APIs (e.g. Supadata `url` query param). */
 export function youtubeWatchUrl(videoId: string): string {
   return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;

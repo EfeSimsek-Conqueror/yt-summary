@@ -26,6 +26,7 @@ import {
   shouldRetryVideoAnalysisWithBrowserTranscript,
   tryPlainTranscriptFromBrowserCaptionFetch,
 } from "@/lib/youtube/client-transcript-fallback";
+import { useUserPreferences } from "@/hooks/use-user-preferences";
 
 const thumbGradients = [
   "from-slate-600 to-slate-900",
@@ -175,6 +176,7 @@ function mapApiSegments(rows: ApiSegment[]): Segment[] {
 
 export function YoutubeWatchLayout({ video, channelLabel }: Props) {
   const playerRef = useRef<YT.Player | null>(null);
+  const { prefs: userPrefs, loading: prefsLoading } = useUserPreferences();
   /** YouTube watch URLs run server-side analysis; start in “pending” so the segment panel never flashes empty copy before the first effect. */
   const canEmbed = isLikelyYoutubeVideoId(video.id);
   /** loading = waiting for API or onReady; ready = can seek; error/timeout = embed failed or stuck */
@@ -356,11 +358,17 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
       setAnalysisError(null);
       try {
         const durationSec = parseDurationLabelToSeconds(video.durationLabel);
+        const lang = userPrefs.analysis_language || (
+          typeof navigator !== "undefined"
+            ? navigator.language.slice(0, 2)
+            : "en"
+        );
         const bodyBase = {
           videoId: video.id,
           videoTitle: video.title,
           ...(durationSec != null ? { durationSec } : {}),
           durationLabel: video.durationLabel,
+          language: lang,
         };
 
         let res = await fetch("/api/ai/video-analysis", {
@@ -503,14 +511,18 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
   }, [runVideoAnalysis]);
 
   useEffect(() => {
-    if (!canEmbed) return;
+    if (!canEmbed || prefsLoading) return;
+    if (!userPrefs.auto_analyze) {
+      setAnalysisBusy(false);
+      return;
+    }
     const ac = new AbortController();
     analysisAbortRef.current = ac;
     void runVideoAnalysis(ac.signal);
     return () => {
       ac.abort();
     };
-  }, [canEmbed, video.id, runVideoAnalysis]);
+  }, [canEmbed, video.id, runVideoAnalysis, prefsLoading, userPrefs.auto_analyze]);
 
   useEffect(() => {
     if (!canEmbed) {
@@ -882,7 +894,11 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
           </p>
         ) : null}
         <p className="mb-3 text-sm text-muted">
-          {channelLabel} · {video.durationLabel} ·{" "}
+          {channelLabel} · {video.durationLabel}
+          {video.publishedAt
+            ? ` · ${new Date(video.publishedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}`
+            : ""}{" "}
+          ·{" "}
           {segments.length === 0
             ? analysisError
               ? "Summary unavailable (see error below)"

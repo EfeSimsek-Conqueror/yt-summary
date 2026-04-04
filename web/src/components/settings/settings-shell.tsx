@@ -39,7 +39,7 @@ export function SettingsShell({ children }: Props) {
                 Settings
               </h1>
               <p className="mt-1 text-sm text-gray-400">
-                Your profile and subscription in one place.
+                Account, billing, preferences, and library.
               </p>
             </div>
           </div>

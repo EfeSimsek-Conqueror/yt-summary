@@ -339,6 +339,8 @@ export async function analyzeTranscriptWithGeminiFlash(input: {
   videoDurationSec?: number;
   /** On-screen description when speech transcript is thin (no-caption fallback). */
   visualContext?: string;
+  /** BCP-47 language tag — analysis output written in this language. Defaults to transcript language. */
+  language?: string;
 }): Promise<TranscriptAnalysis> {
   const visual =
     input.visualContext?.trim() &&
@@ -361,13 +363,19 @@ export async function analyzeTranscriptWithGeminiFlash(input: {
     input.videoDurationSec > 0 &&
     Number.isFinite(input.videoDurationSec);
 
+  const langTag = input.language?.trim().slice(0, 10);
+  const langRule =
+    langTag && langTag.toLowerCase() !== "en"
+      ? `\n\n- Output language: Write summary_detailed, summary_short, revelations, key_points, key_moments, segment titles and bullets ALL in ${langTag}. JSON field names stay in English.`
+      : "";
+
   const client = getFalOpenAI();
 
   let response: Awaited<ReturnType<typeof client.responses.create>>;
   try {
     response = await client.responses.create({
       model: GEMINI_FLASH,
-      instructions: `${INSTRUCTIONS}${hasDuration ? DURATION_SEGMENT_RULES : ""}${visual ? VISUAL_MERGE_RULES : ""}`,
+      instructions: `${INSTRUCTIONS}${hasDuration ? DURATION_SEGMENT_RULES : ""}${visual ? VISUAL_MERGE_RULES : ""}${langRule}`,
       input: body,
       temperature: 0.35,
       max_output_tokens: 16_384,

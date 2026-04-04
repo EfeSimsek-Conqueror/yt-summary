@@ -32,6 +32,8 @@ export type Video = {
   thumbnailUrl?: string;
   /** Channel display name from YouTube snippet (when not in mock catalog) */
   channelTitle?: string;
+  /** ISO 8601 publish date from YouTube snippet.publishedAt */
+  publishedAt?: string;
 };
 
 /** AI video analysis payload (client-side state + API response shape) */

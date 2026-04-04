@@ -26,6 +26,7 @@ type YtVideoItem = {
     description?: string;
     channelId?: string;
     channelTitle?: string;
+    publishedAt?: string;
     thumbnails?: { high?: { url?: string }; medium?: { url?: string } };
   };
   contentDetails?: { duration?: string };
@@ -49,6 +50,7 @@ function videoFromListItem(item: YtVideoItem): Video | null {
       "Transcript will appear here after processing.",
     segments: [],
     thumbnailUrl: sn.thumbnails?.high?.url ?? sn.thumbnails?.medium?.url,
+    publishedAt: sn.publishedAt,
   };
 }
 

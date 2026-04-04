@@ -1,16 +1,26 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect } from "react";
 import type { Video } from "@/lib/types";
 import { getChannel } from "@/lib/mock-data";
 import { YoutubeWatchLayout } from "./youtube-watch-layout";
+import { usePlaylistOptional } from "./playlist/playlist-context";
 
 type Props = {
   video: Video;
 };
 
 export function VideoDetail({ video }: Props) {
+  const playlist = usePlaylistOptional();
   const channel = getChannel(video.channelId);
   const channelLabel =
     video.channelTitle ?? channel?.title ?? "Channel";
+
+  useEffect(() => {
+    playlist?.setCurrentVideo(video.id);
+    return () => playlist?.setCurrentVideo(null);
+  }, [video.id, playlist]);
 
   const backHref =
     video.channelId && video.channelId.length > 0

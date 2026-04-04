@@ -40,6 +40,8 @@ const bodySchema = z.object({
   durationLabel: z.string().max(32).optional(),
   /** When captions cannot be fetched, paste at least 400 chars to analyze. */
   transcriptPlain: z.string().max(120_000).optional(),
+  /** BCP-47 language tag for analysis output (e.g. "en", "tr", "de"). */
+  language: z.string().min(2).max(10).optional(),
 });
 
 const MAX_MODEL_INPUT = 100_000;
@@ -151,6 +153,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const analysisLang = parsed.data.language?.slice(0, 10) ?? "en";
+
+    const { data: cached } = await supabase
+      .from("video_analyses")
+      .select("analysis")
+      .eq("user_id", user.id)
+      .eq("video_id", parsed.data.videoId)
+      .eq("language", analysisLang)
+      .maybeSingle();
+
+    if (cached?.analysis) {
+      const a = cached.analysis as Record<string, unknown>;
+      return NextResponse.json({
+        contentKind: a.content_kind ?? a.contentKind ?? "other",
+        hasSpoilers: a.has_spoilers ?? a.hasSpoilers ?? false,
+        summaryDetailed: a.summary_detailed ?? a.summaryDetailed ?? "",
+        summaryShort: a.summary_short ?? a.summaryShort ?? "",
+        revelations: a.revelations ?? [],
+        keyPoints: a.key_points ?? a.keyPoints ?? [],
+        keyMoments: a.key_moments ?? a.keyMoments ?? [],
+        segments: a.segments ?? [],
+        hypeMoments: a.hype_moments ?? a.hypeMoments ?? [],
+        transcriptDensityScore: null,
+        usedVisualFallback: false,
+        creditsCharged: 0,
+        creditsRemaining: undefined,
+        cached: true,
+      });
+    }
+
     let items: TranscriptResponse[] | null = null;
     let transcriptFetchError: { status: number; message: string } | null =
       null;
@@ -233,6 +265,7 @@ export async function POST(request: NextRequest) {
       transcript: forModel,
       videoTitle: parsed.data.videoTitle,
       videoDurationSec: videoDurationSecForAnalysis,
+      language: parsed.data.language,
     });
 
     const { creditsRemaining, creditsCharged } =
@@ -241,6 +274,16 @@ export async function POST(request: NextRequest) {
         billingDurationSec,
         creditsBefore,
       );
+
+    await supabase.from("video_analyses").upsert(
+      {
+        user_id: user.id,
+        video_id: parsed.data.videoId,
+        language: analysisLang,
+        analysis: analysis as unknown as Record<string, unknown>,
+      },
+      { onConflict: "user_id,video_id,language" },
+    );
 
     return NextResponse.json({
       contentKind: analysis.content_kind,
