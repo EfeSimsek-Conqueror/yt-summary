@@ -3,6 +3,7 @@
 import {
   formatGoogleAuthLinkError,
   linkGoogleForYoutube,
+  signInWithGoogle,
 } from "@/lib/auth/google-oauth";
 import { useState } from "react";
 
@@ -41,7 +42,14 @@ export function ConnectYoutubeCta({
           const next = `${window.location.pathname}${window.location.search}`;
           void linkGoogleForYoutube(next)
             .catch((e: unknown) => {
-              setError(formatGoogleAuthLinkError(e));
+              const msg = formatGoogleAuthLinkError(e);
+              if (
+                msg.includes("already linked") ||
+                msg.includes("Identity is already linked")
+              ) {
+                return signInWithGoogle(next);
+              }
+              setError(msg);
             })
             .finally(() => {
               setBusy(false);
