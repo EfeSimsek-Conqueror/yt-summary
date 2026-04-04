@@ -16,6 +16,7 @@ const geistMono = Geist_Mono({
 
 export async function generateMetadata(): Promise<Metadata> {
   const siteUrl = await resolveSiteUrlForMetadata();
+  const logoPath = "/vidsum-app-logo.png";
   return {
     metadataBase: new URL(`${siteUrl}/`),
     title: {
@@ -24,13 +25,27 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     description:
       "VidSum — AI summaries, segments, and takeaways for your YouTube subscriptions and search.",
+    icons: {
+      icon: [{ url: logoPath, type: "image/png", sizes: "768x768" }],
+      apple: [{ url: logoPath, type: "image/png", sizes: "180x180" }],
+      shortcut: logoPath,
+    },
     openGraph: {
       type: "website",
       siteName: "VidSum",
       url: siteUrl,
+      images: [
+        {
+          url: logoPath,
+          width: 768,
+          height: 768,
+          alt: "VidSum",
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
+      images: [logoPath],
     },
   };
 }

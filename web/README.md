@@ -2,7 +2,7 @@
 
 Next.js app for YouTube subscriptions, search, and AI-powered summaries.
 
-**Production URL:** set `NEXT_PUBLIC_APP_URL` to your live origin (e.g. `https://….up.railway.app` until DNS for `vidsum.ai` works), and add **`…/oauth/return`** to Supabase **Redirect URLs** (same origin as Site URL). Root `/?code=` is forwarded to `/oauth/return` in middleware.
+**Production URL:** set `NEXT_PUBLIC_APP_URL` to **`https://vidsum.ai`** (no trailing slash), and add **`https://vidsum.ai/oauth/return`** to Supabase **Redirect URLs** (same origin as Site URL). For Railway preview deploys, add that origin’s `/oauth/return` too. Root `/?code=` is forwarded to `/oauth/return` in middleware.
 
 **YouTube Data API (subscriptions, search, uploads):** users need a Google OAuth token with `youtube.readonly`. In **Supabase Dashboard → Authentication**, enable **Manual identity linking** so “Grant YouTube access” (`linkIdentity`) works for users who signed in with email first. Set **GOOGLE_OAUTH_CLIENT_ID** and **GOOGLE_OAUTH_CLIENT_SECRET** (same Web client as Supabase Google provider) so refresh-token exchange works after JWT refresh. Enable **YouTube Data API v3** in Google Cloud and add the `youtube.readonly` scope on the OAuth consent screen.
 

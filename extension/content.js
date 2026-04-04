@@ -191,13 +191,14 @@ button.vs-logo {
   padding: 0;
   margin: 0;
   border-radius: 10px;
-  background: linear-gradient(135deg, #3b82f6, #a855f7);
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   cursor: pointer;
   font: inherit;
+  overflow: hidden;
 }
 button.vs-logo:hover {
   filter: brightness(1.08);
@@ -205,6 +206,13 @@ button.vs-logo:hover {
 button.vs-logo:focus-visible {
   outline: 2px solid #60a5fa;
   outline-offset: 2px;
+}
+.vs-logo img {
+  width: 40px;
+  height: 40px;
+  display: block;
+  object-fit: cover;
+  border-radius: 10px;
 }
 .vs-logo svg { width: 22px; height: 22px; color: #fff; }
 .vs-titles h1 {
@@ -381,6 +389,11 @@ button.vs-logo:focus-visible {
 .vs-signout:hover { background: #7f1d1d; }
 .vs-hidden { display: none !important; }
 `;
+  }
+
+  function logoMarkHtml() {
+    const src = chrome.runtime.getURL("icons/icon48.png");
+    return `<img src="${src}" width="40" height="40" alt="" draggable="false" />`;
   }
 
   function iconCamera() {
@@ -647,7 +660,7 @@ button.vs-logo:focus-visible {
       <div class="vs-wrap">
         <div class="vs-header">
           <div class="vs-header-main">
-            <button type="button" class="vs-logo" data-action="open-vidsum" aria-label="Open this video in VidSum" title="Open in VidSum">${iconCamera()}</button>
+            <button type="button" class="vs-logo" data-action="open-vidsum" aria-label="Open this video in VidSum" title="Open in VidSum">${logoMarkHtml()}</button>
             <div class="vs-titles">
               <h1>VidSum Extension</h1>
               <p>Current Video Analysis</p>

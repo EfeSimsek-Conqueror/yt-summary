@@ -1,15 +1,9 @@
 "use client";
 
 import { signInWithGoogle } from "@/lib/auth/google-oauth";
-import {
-  ArrowLeft,
-  BarChart3,
-  LineChart,
-  Play,
-  Sparkles,
-  Zap,
-} from "lucide-react";
+import { ArrowLeft, BarChart3, LineChart, Sparkles, Zap } from "lucide-react";
 import Link from "next/link";
+import { VidSumLogoMark } from "@/components/vidsum-logo-mark";
 
 function GoogleMark({ className }: { className?: string }) {
   return (
@@ -68,14 +62,10 @@ export function GuestLoginOverlay() {
           {/* Brand above card — sits higher under top nav */}
           <div className="mb-6 flex flex-col items-center text-center sm:mb-7">
             <div
-              className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-500 via-purple-600 to-violet-700 shadow-lg shadow-purple-900/40 ring-1 ring-white/10"
+              className="shadow-lg shadow-purple-900/40 ring-1 ring-white/10"
               aria-hidden
             >
-              <Play
-                className="h-7 w-7 translate-x-0.5 text-white"
-                fill="currentColor"
-                strokeWidth={0}
-              />
+              <VidSumLogoMark size={56} rounded="2xl" />
             </div>
             <h1
               className="mt-4 flex items-center gap-1.5 text-2xl font-bold tracking-tight text-white"

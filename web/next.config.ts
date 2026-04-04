@@ -8,6 +8,14 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: webRoot,
   },
+  async rewrites() {
+    return [
+      {
+        source: "/favicon.ico",
+        destination: "/vidsum-app-logo.png",
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "yt3.ggpht.com", pathname: "/**" },

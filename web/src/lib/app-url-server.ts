@@ -7,7 +7,7 @@ import {
 /**
  * Canonical site URL for metadata (OG, metadataBase). Uses the incoming
  * request host when it differs from NEXT_PUBLIC_APP_URL so Railway / preview
- * URLs work before custom DNS (e.g. vidsum.ai) is live.
+ * deploys still get correct OG URLs without changing env.
  */
 export async function resolveSiteUrlForMetadata(): Promise<string> {
   const h = await headers();

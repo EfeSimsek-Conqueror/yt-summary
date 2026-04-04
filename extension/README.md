@@ -19,7 +19,7 @@ Enable **“Show floating panel on YouTube”** in the popup, then open a **norm
 
 - Click the extension icon → set **VidSum site URL**:
   - **Local dev:** `http://localhost:3000` (must be **http**, not `https://localhost`, unless you use HTTPS locally).
-  - **Production:** `https://your-domain.com` (no trailing slash).
+  - **Production:** `https://vidsum.ai` (no trailing slash).
 - **Sign in on VidSum** in a normal browser tab (paste your VidSum URL in the address bar). OAuth runs on the website. The extension only **reads cookies** to show “signed in” in the popup; it does not open tabs for you.
 
 ### “I can’t sign in”
@@ -49,4 +49,4 @@ The YouTube overlay does **not** open VidSum URLs; it stays on the video page.
 
 ## Icons
 
-`icons/` are resized from `web/public/vidsum-logo.png`.
+`icons/` are resized from `web/public/vidsum-app-logo.png` (run `sips` or your image tool after updating the source).

@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ArrowLeft, Video } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { SettingsNav } from "@/components/settings/settings-nav";
+import { VidSumLogoMark } from "@/components/vidsum-logo-mark";
 
 type Props = {
   children: React.ReactNode;
@@ -20,8 +21,8 @@ export function SettingsShell({ children }: Props) {
           </Link>
 
           <div className="flex flex-wrap items-center gap-4">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg shadow-purple-500/25">
-              <Video className="h-6 w-6 text-white" />
+            <div className="shadow-lg shadow-purple-500/25">
+              <VidSumLogoMark size={44} rounded="xl" />
             </div>
             <div>
               <h1

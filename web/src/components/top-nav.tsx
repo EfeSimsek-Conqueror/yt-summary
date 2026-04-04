@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Video } from "lucide-react";
 import { AuthControls } from "./auth-controls";
+import { VidSumLogoMark } from "./vidsum-logo-mark";
 
 export function TopNav() {
   return (
@@ -12,12 +12,7 @@ export function TopNav() {
         href="/dashboard/discover"
         className="flex items-center gap-2 transition-opacity hover:opacity-90"
       >
-        <div
-          className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-purple-600"
-          aria-hidden
-        >
-          <Video className="h-4 w-4 text-white" />
-        </div>
+        <VidSumLogoMark size={28} rounded="lg" />
         <span className="text-[17px] font-semibold tracking-tight text-white">
           VidSum
         </span>

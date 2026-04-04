@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Video } from "lucide-react";
+import { VidSumLogoMark } from "@/components/vidsum-logo-mark";
 import type { LandingSong } from "@/data/landing-coverflow-songs";
 import { LandingCoverflowHero } from "@/components/landing/landing-coverflow-hero";
 import { VynoraLanding } from "@/components/vynora-landing";
@@ -14,9 +14,7 @@ export function LandingPage({ songs }: Props) {
       <header className="fixed top-0 z-50 w-full border-b border-gray-800 bg-black/50 backdrop-blur-lg">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-purple-600">
-              <Video className="h-5 w-5 text-white" />
-            </div>
+            <VidSumLogoMark size={32} rounded="lg" />
             <span className="text-xl font-semibold">VidSum</span>
           </Link>
           <nav className="hidden gap-8 md:flex">
@@ -58,9 +56,7 @@ export function LandingPage({ songs }: Props) {
           <div className="mb-8 grid gap-8 md:grid-cols-4">
             <div>
               <div className="mb-4 flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-purple-600">
-                  <Video className="h-5 w-5 text-white" />
-                </div>
+                <VidSumLogoMark size={32} rounded="lg" />
                 <span className="text-xl font-semibold">VidSum</span>
               </div>
               <p className="text-sm text-gray-400">

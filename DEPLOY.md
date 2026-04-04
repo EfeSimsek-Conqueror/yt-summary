@@ -8,7 +8,7 @@
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Evet | Aynı (anon / public key) |
 | `FAL_KEY` | AI özellikleri için evet | [fal.ai](https://fal.ai/dashboard) → API Keys |
 | `SUPADATA_API_KEY` | Transcript (YouTube) için evet | [supadata.ai](https://supadata.ai) — **tam isim** `SUPADATA_API_KEY` veya `SUPADATA_KEY` ( `NEXT_PUBLIC_` değil). Railway’de **bu Next.js servisinin** Variables sekmesinde olmalı; ekledikten sonra **Redeploy**. Okuma `web/src/lib/server/supadata-env.ts` içinde (build sırasında sabitlenmesin diye string birleştirme ile). Doğrulama: `GET /api/health/env` → `{"supadataConfigured":true}`. |
-| `NEXT_PUBLIC_APP_URL` | Önerilir (OAuth + metadata) | Railway’de servisin public URL’si, örn. `https://yt-summary-production-xxxx.up.railway.app` — custom domain yokken bunu kullanın; Supabase **Site URL** ve redirect listesi ile aynı olmalı. DNS çalışmayan `vidsum.ai` burada ve Supabase’te tanımlıysa giriş hata verir; geçici olarak Railway URL’sine çevirin. |
+| `NEXT_PUBLIC_APP_URL` | Önerilir (OAuth + metadata) | Üretim: **`https://vidsum.ai`** — Supabase **Site URL** ve redirect listesi ile aynı olmalı. Önizleme veya geçici deploy için Railway URL’si (`https://….up.railway.app`) kullanıyorsanız, o origin’i de Supabase redirect listesine ekleyin. |
 
 **Asla repoya commit etmeyin:** `.env.local`, gerçek `FAL_KEY` veya `service_role` anahtarı.
 
@@ -19,7 +19,7 @@
 
 ## Supabase (üretim URL)
 
-- **Site URL** ve **Redirect URLs** listesine, uygulamanın gerçekten açıldığı adresi yazın (`NEXT_PUBLIC_APP_URL` ile aynı). Callback path: **`/oauth/return`** (örn. `https://xxxxx.up.railway.app/oauth/return`). Eski `/auth/callback` uygulama içinde `/oauth/return`’e yönlendirilir. Custom domain gelince `https://vidsum.ai/oauth/return` ekleyin. Ana sayfaya düşen `/?code=…` middleware ile `/oauth/return`’e alınır.
+- **Site URL** ve **Redirect URLs** listesine, kullanıcıların açtığı adresi yazın (`NEXT_PUBLIC_APP_URL` ile aynı). Üretim için örnek: **`https://vidsum.ai/oauth/return`**. Önizleme/staging Railway URL’si kullanıyorsanız onu da ekleyin. Callback path: **`/oauth/return`**. Eski `/auth/callback` uygulama içinde `/oauth/return`’e yönlendirilir. Ana sayfaya düşen `/?code=…` middleware ile `/oauth/return`’e alınır.
 
 ## Monorepo kökü
 

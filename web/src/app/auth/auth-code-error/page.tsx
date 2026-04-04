@@ -31,15 +31,15 @@ export default async function AuthCodeErrorPage({ searchParams }: Props) {
           </code>
           — for example{" "}
           <code className="rounded bg-black/40 px-1 py-0.5 text-[0.7rem] text-foreground/90">
-            https://my-service.up.railway.app/oauth/return
+            https://vidsum.ai/oauth/return
           </code>
           . Do not paste placeholders with{" "}
           <code className="text-[0.7rem]">&lt;angle brackets&gt;</code>; use the
-          exact hostname from Railway (or your domain).
+          exact hostname users open (production or preview).
         </li>
         <li>
           Supabase Site URL must match the app origin you use in the browser
-          (e.g. Railway app URL).
+          (e.g. <code className="rounded bg-black/40 px-1 py-0.5 text-[0.7rem]">https://vidsum.ai</code>).
         </li>
         <li>
           Google Cloud → OAuth client for Supabase: authorized redirect URIs
