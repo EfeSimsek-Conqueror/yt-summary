@@ -10,10 +10,8 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     return [
-      {
-        source: "/favicon.ico",
-        destination: "/vidsum-app-logo.png",
-      },
+      // Browsers and crawlers often request /favicon.ico; app/icon.png is canonical.
+      { source: "/favicon.ico", destination: "/icon.png" },
     ];
   },
   images: {

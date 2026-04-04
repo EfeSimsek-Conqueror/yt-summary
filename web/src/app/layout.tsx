@@ -25,11 +25,6 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     description:
       "VidSum — AI summaries, segments, and takeaways for your YouTube subscriptions and search.",
-    icons: {
-      icon: [{ url: logoPath, type: "image/png", sizes: "870x870" }],
-      apple: [{ url: logoPath, type: "image/png", sizes: "180x180" }],
-      shortcut: logoPath,
-    },
     openGraph: {
       type: "website",
       siteName: "VidSum",
