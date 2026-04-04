@@ -40,16 +40,9 @@ export function ConnectYoutubeCta({
           setError(null);
           setBusy(true);
           const next = `${window.location.pathname}${window.location.search}`;
-          void linkGoogleForYoutube(next)
+          void signInWithGoogle(next)
             .catch((e: unknown) => {
-              const msg = formatGoogleAuthLinkError(e);
-              if (
-                msg.includes("already linked") ||
-                msg.includes("Identity is already linked")
-              ) {
-                return signInWithGoogle(next);
-              }
-              setError(msg);
+              setError(formatGoogleAuthLinkError(e));
             })
             .finally(() => {
               setBusy(false);
