@@ -5,7 +5,7 @@ import { VidSumLogoMark } from "./vidsum-logo-mark";
 export function TopNav() {
   return (
     <header
-      className="sticky top-0 z-[200] flex h-14 min-w-0 shrink-0 items-center justify-between overflow-x-hidden border-b border-gray-800 bg-zinc-950 px-6"
+      className="sticky top-0 z-[200] flex h-14 min-w-0 shrink-0 items-center justify-between border-b border-gray-800 bg-zinc-950 px-6"
       aria-label="Top navigation"
     >
       <Link

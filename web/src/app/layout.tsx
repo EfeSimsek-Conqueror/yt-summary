@@ -26,7 +26,7 @@ export async function generateMetadata(): Promise<Metadata> {
     description:
       "VidSum — AI summaries, segments, and takeaways for your YouTube subscriptions and search.",
     icons: {
-      icon: [{ url: logoPath, type: "image/png", sizes: "768x768" }],
+      icon: [{ url: logoPath, type: "image/png", sizes: "870x870" }],
       apple: [{ url: logoPath, type: "image/png", sizes: "180x180" }],
       shortcut: logoPath,
     },
@@ -37,8 +37,8 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [
         {
           url: logoPath,
-          width: 768,
-          height: 768,
+          width: 870,
+          height: 870,
           alt: "VidSum",
         },
       ],
