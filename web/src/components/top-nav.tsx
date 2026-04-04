@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AuthControls } from "./auth-controls";
-import { VidSumLogoMark } from "./vidsum-logo-mark";
+import { VidSumWordmark } from "./vidsum-wordmark";
 
 export function TopNav() {
   return (
@@ -10,12 +10,9 @@ export function TopNav() {
     >
       <Link
         href="/dashboard/discover"
-        className="flex items-center gap-2 transition-opacity hover:opacity-90"
+        className="flex min-w-0 items-center transition-opacity hover:opacity-90"
       >
-        <VidSumLogoMark size={28} rounded="lg" />
-        <span className="text-[17px] font-semibold tracking-tight text-white">
-          VidSum
-        </span>
+        <VidSumWordmark size="md" />
       </Link>
       <div className="flex items-center gap-4">
         <AuthControls />

@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Compass } from "lucide-react";
+import { VidSumWordmark } from "@/components/vidsum-wordmark";
 import type { Channel } from "@/lib/types";
 
 type Props = {
@@ -23,6 +24,12 @@ export function SubscriptionSidebar({
       className="w-[280px] shrink-0 border-r border-gray-800 bg-zinc-950 py-4 pl-3 pr-2"
       aria-label="Sidebar"
     >
+      <Link
+        href="/dashboard/discover"
+        className="mb-4 flex min-w-0 items-center px-3 py-1 transition-opacity hover:opacity-90"
+      >
+        <VidSumWordmark size="md" />
+      </Link>
       <Link
         href="/dashboard/discover"
         className={`mb-5 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${

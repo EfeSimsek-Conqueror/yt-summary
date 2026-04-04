@@ -32,8 +32,8 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [
         {
           url: logoPath,
-          width: 870,
-          height: 870,
+          width: 512,
+          height: 512,
           alt: "VidSum",
         },
       ],

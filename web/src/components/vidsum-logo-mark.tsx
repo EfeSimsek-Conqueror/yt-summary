@@ -6,6 +6,8 @@ type Props = {
   size: number;
   className?: string;
   rounded?: "lg" | "xl" | "2xl";
+  /** LCP / above-the-fold (e.g. landing header). */
+  priority?: boolean;
 };
 
 const roundedClass: Record<NonNullable<Props["rounded"]>, string> = {
@@ -18,6 +20,7 @@ export function VidSumLogoMark({
   size,
   className = "",
   rounded = "lg",
+  priority = false,
 }: Props) {
   return (
     <Image
@@ -25,7 +28,8 @@ export function VidSumLogoMark({
       alt=""
       width={size}
       height={size}
-      className={`${roundedClass[rounded]} object-cover ${className}`.trim()}
+      priority={priority}
+      className={`${roundedClass[rounded]} object-contain ${className}`.trim()}
       aria-hidden
     />
   );

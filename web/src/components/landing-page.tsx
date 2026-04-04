@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { VidSumLogoMark } from "@/components/vidsum-logo-mark";
+import { VidSumWordmark } from "@/components/vidsum-wordmark";
 import type { LandingSong } from "@/data/landing-coverflow-songs";
 import { LandingCoverflowHero } from "@/components/landing/landing-coverflow-hero";
 import { VynoraLanding } from "@/components/vynora-landing";
@@ -13,9 +13,8 @@ export function LandingPage({ songs }: Props) {
     <div className="min-h-screen bg-black text-white">
       <header className="fixed top-0 z-50 w-full border-b border-gray-800 bg-black/50 backdrop-blur-lg">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-2">
-            <VidSumLogoMark size={32} rounded="lg" />
-            <span className="text-xl font-semibold">VidSum</span>
+          <Link href="/" className="flex min-w-0 items-center">
+            <VidSumWordmark size="lg" priority />
           </Link>
           <nav className="hidden gap-8 md:flex">
             <a
@@ -55,9 +54,8 @@ export function LandingPage({ songs }: Props) {
         <div className="mx-auto max-w-7xl">
           <div className="mb-8 grid gap-8 md:grid-cols-4">
             <div>
-              <div className="mb-4 flex items-center gap-2">
-                <VidSumLogoMark size={32} rounded="lg" />
-                <span className="text-xl font-semibold">VidSum</span>
+              <div className="mb-4 flex items-center">
+                <VidSumWordmark size="lg" />
               </div>
               <p className="text-sm text-gray-400">
                 AI-powered YouTube analysis: segments, summaries, and takeaways.
