@@ -3,16 +3,18 @@
 import { isAuthError } from "@supabase/auth-js";
 import { OAUTH_CALLBACK_PATH } from "@/lib/auth/oauth-callback-path";
 import { getOAuthRedirectOrigin } from "@/lib/app-url";
+import { defaultDashboardAfterLogin } from "@/lib/discover-enabled";
 import { createClient } from "@/lib/supabase/client";
 
 const YOUTUBE_GOOGLE_SCOPES =
   "https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile";
 
 /** `next` must be a path on this origin (e.g. current page). */
-export async function signInWithGoogle(next: string = "/dashboard/discover") {
+export async function signInWithGoogle(next?: string) {
   const supabase = createClient();
   const origin = getOAuthRedirectOrigin();
-  const safeNext = next.startsWith("/") ? next : "/dashboard/discover";
+  const fallback = defaultDashboardAfterLogin();
+  const safeNext = next && next.startsWith("/") ? next : fallback;
   await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
@@ -30,10 +32,11 @@ export async function signInWithGoogle(next: string = "/dashboard/discover") {
  * For users already signed in (e.g. email) without `session.provider_token`:
  * link Google with YouTube scope so subscriptions/search can use the Data API.
  */
-export async function linkGoogleForYoutube(next: string = "/dashboard/discover") {
+export async function linkGoogleForYoutube(next?: string) {
   const supabase = createClient();
   const origin = getOAuthRedirectOrigin();
-  const safeNext = next.startsWith("/") ? next : "/dashboard/discover";
+  const fallback = defaultDashboardAfterLogin();
+  const safeNext = next && next.startsWith("/") ? next : fallback;
   const { error } = await supabase.auth.linkIdentity({
     provider: "google",
     options: {

@@ -421,14 +421,22 @@ export function VynoraLanding({ songs }: VynoraLandingProps) {
                   whileTap={{ scale: 0.95 }}
                 >
                   <Link
-                    href="/dashboard"
+                    href={
+                      planId === "scout"
+                        ? "/dashboard"
+                        : planId === "navigator"
+                          ? "/settings/billing?plan=navigator"
+                          : "/settings/billing?plan=captain"
+                    }
                     className={`block w-full rounded-xl py-4 text-center text-lg font-bold transition-all ${
                       highlighted
                         ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50"
                         : "bg-gray-700 text-white hover:bg-gray-600"
                     }`}
                   >
-                    {highlighted ? "Get started" : "Choose plan"}
+                    {planId === "scout"
+                      ? "Start free"
+                      : "Subscribe with Stripe"}
                   </Link>
                 </motion.div>
               </motion.div>
@@ -491,14 +499,22 @@ export function VynoraLanding({ songs }: VynoraLandingProps) {
               No credit card for Scout—paid tiers via Stripe when you upgrade
             </span>
           </p>
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+          <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Link
+                href="/dashboard"
+                className="inline-block rounded-xl bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 px-10 py-5 text-xl font-bold text-white shadow-2xl shadow-purple-500/40 transition-all hover:shadow-purple-500/60"
+              >
+                Go to dashboard
+              </Link>
+            </motion.div>
             <Link
-              href="/dashboard"
-              className="inline-block rounded-xl bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 px-10 py-5 text-xl font-bold text-white shadow-2xl shadow-purple-500/40 transition-all hover:shadow-purple-500/60"
+              href="/settings/billing"
+              className="text-sm font-semibold text-purple-300 underline decoration-purple-500/50 underline-offset-4 transition hover:text-white"
             >
-              Go to dashboard
+              Paid plans — Stripe checkout
             </Link>
-          </motion.div>
+          </div>
         </motion.div>
       </div>
     </div>

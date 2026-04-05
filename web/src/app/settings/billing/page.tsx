@@ -1,6 +1,15 @@
+import { Suspense, type ReactNode } from "react";
+import { BillingPlanFocus } from "@/components/billing/billing-plan-focus";
+import { SignInForBillingButton } from "@/components/billing/sign-in-for-billing-button";
 import { BillingStripeActions } from "@/components/billing-stripe-actions";
+import { StripeSubscribeButton } from "@/components/stripe-subscribe-button";
 import { getBillingSnapshot, subscriptionStatusLabel } from "@/lib/billing/settings-billing-snapshot";
-import { formatPlanPrice, PLANS, PLAN_ORDER, type PlanDefinition } from "@/lib/billing/plans";
+import {
+  formatPlanPrice,
+  PLANS,
+  PLAN_ORDER,
+  type PlanDefinition,
+} from "@/lib/billing/plans";
 import { formatCreditsDisplay } from "@/lib/billing/video-credits";
 import { createClient } from "@/lib/supabase/server";
 import { CheckCircle2, Crown, Sparkles, Star } from "lucide-react";
@@ -9,10 +18,12 @@ function PlanCard({
   plan,
   isCurrent,
   isPopular,
+  footerSlot,
 }: {
   plan: PlanDefinition;
   isCurrent: boolean;
   isPopular: boolean;
+  footerSlot?: ReactNode;
 }) {
   const borderClass = isCurrent
     ? "border-purple-500/60 ring-1 ring-purple-500/30"
@@ -86,11 +97,22 @@ function PlanCard({
           </li>
         ) : null}
       </ul>
+      {footerSlot ? (
+        <div className="mt-5 border-t border-gray-700/50 pt-4">{footerSlot}</div>
+      ) : null}
     </div>
   );
 }
 
-export default async function BillingPage() {
+type BillingPageProps = {
+  searchParams: Promise<{ checkout?: string; plan?: string }>;
+};
+
+export default async function BillingPage({ searchParams }: BillingPageProps) {
+  const sp = await searchParams;
+  const checkoutFlag =
+    typeof sp.checkout === "string" ? sp.checkout.trim() : "";
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -121,6 +143,10 @@ export default async function BillingPage() {
 
   return (
     <div className="space-y-8">
+      <Suspense fallback={null}>
+        <BillingPlanFocus />
+      </Suspense>
+
       <header>
         <p className="text-xs font-semibold uppercase tracking-wide text-purple-300/80">
           Plan &amp; billing
@@ -130,16 +156,52 @@ export default async function BillingPage() {
         </p>
       </header>
 
+      {checkoutFlag === "success" ? (
+        <p
+          className="rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-100/95"
+          role="status"
+        >
+          Payment successful — your subscription will update in a moment. If
+          credits don&apos;t refresh, refresh this page.
+        </p>
+      ) : checkoutFlag === "canceled" ? (
+        <p
+          className="rounded-xl border border-amber-500/35 bg-amber-950/25 px-4 py-3 text-sm text-amber-100/95"
+          role="status"
+        >
+          Checkout was canceled. You can subscribe anytime from the buttons
+          below.
+        </p>
+      ) : null}
+
       {/* Plan comparison cards */}
       <div className="grid gap-4 sm:grid-cols-3">
-        {PLAN_ORDER.map((id) => (
-          <PlanCard
-            key={id}
-            plan={PLANS[id]}
-            isCurrent={id === snapshot.effectivePlanId}
-            isPopular={PLANS[id].popular === true}
-          />
-        ))}
+        {PLAN_ORDER.map((id) => {
+          const tier = PLANS[id];
+          const showSubscribe =
+            snapshot.stripeConfigured &&
+            id !== "scout" &&
+            id !== snapshot.effectivePlanId;
+          let footer: ReactNode;
+          if (showSubscribe) {
+            footer = user ? (
+              <StripeSubscribeButton
+                tier={id === "navigator" ? "navigator" : "captain"}
+              />
+            ) : (
+              <SignInForBillingButton returnTo={`/settings/billing?plan=${id}`} />
+            );
+          }
+          return (
+            <PlanCard
+              key={id}
+              plan={tier}
+              isCurrent={id === snapshot.effectivePlanId}
+              isPopular={tier.popular === true}
+              footerSlot={footer}
+            />
+          );
+        })}
       </div>
 
       {/* Credits meter */}
@@ -191,20 +253,25 @@ export default async function BillingPage() {
         </p>
       </section>
 
-      {/* Stripe actions */}
-      {user && snapshot.stripeConfigured ? (
-        <section className="rounded-2xl border border-gray-700/50 bg-gradient-to-br from-gray-800/40 to-gray-950/80 p-6">
+      {/* Stripe: manage subscription (Checkout starts from plan cards above) */}
+      {snapshot.stripeConfigured ? (
+        <section
+          id="stripe-billing-actions"
+          className="rounded-2xl border border-gray-700/50 bg-gradient-to-br from-gray-800/40 to-gray-950/80 p-6"
+        >
           <BillingStripeActions
-            planId={snapshot.effectivePlanId}
             hasStripeCustomer={snapshot.hasStripeCustomer}
           />
         </section>
-      ) : user && !snapshot.stripeConfigured ? (
+      ) : (
         <p className="text-sm text-gray-500">
-          Stripe is not configured on this deployment — paid checkout is
-          unavailable.
+          Stripe is not configured on this deployment — add{" "}
+          <code className="rounded bg-zinc-800 px-1 py-0.5 text-xs">
+            STRIPE_SECRET_KEY
+          </code>{" "}
+          and price IDs to enable paid checkout.
         </p>
-      ) : null}
+      )}
     </div>
   );
 }

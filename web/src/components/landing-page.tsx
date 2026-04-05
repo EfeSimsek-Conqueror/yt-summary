@@ -79,6 +79,14 @@ export function LandingPage({ songs }: Props) {
                     Dashboard
                   </Link>
                 </li>
+                <li>
+                  <Link
+                    href="/settings/billing"
+                    className="transition hover:text-white"
+                  >
+                    Plan &amp; billing
+                  </Link>
+                </li>
               </ul>
             </div>
             <div>

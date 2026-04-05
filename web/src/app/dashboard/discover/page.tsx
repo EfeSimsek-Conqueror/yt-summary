@@ -1,8 +1,10 @@
 import { AppShell } from "@/components/app-shell";
+import { DiscoverComingSoon } from "@/components/discover-coming-soon";
 import { VideoCard } from "@/components/video-card";
 import { VideoSearchBar } from "@/components/video-search-bar";
 import { YoutubeSyncHint } from "@/components/youtube-sync-hint";
 import { userHasGoogleIdentity } from "@/lib/auth/google-identity";
+import { isDiscoverEnabled } from "@/lib/discover-enabled";
 import { DISCOVER_CATEGORIES } from "@/lib/discover-categories";
 import { getChannelsForUser } from "@/lib/channels-for-user";
 import { getVideosForChannel } from "@/lib/mock-data";
@@ -34,6 +36,40 @@ export default async function DiscoverPage() {
 
   const resolvedId =
     channels.length > 0 ? channels[0]!.id : "c1";
+
+  if (!isDiscoverEnabled()) {
+    const signedIn = Boolean(user);
+    const hasGoogleIdentity = userHasGoogleIdentity(user);
+    return (
+      <AppShell
+        channels={channels}
+        activeChannelId={resolvedId}
+        suppressSidebarActive
+        isAuthenticated={!!user}
+        sidebarActiveView="discover"
+      >
+        <main className="min-w-0 overflow-x-hidden p-6 px-7 lg:p-7">
+          <YoutubeSyncHint
+            needsYoutubeScope={needsYoutubeScope}
+            youtubeError={youtubeError}
+            source={source}
+            isSignedIn={signedIn}
+            hasGoogleIdentity={hasGoogleIdentity}
+          />
+          <div className="mb-8">
+            <VideoSearchBar
+              defaultQuery=""
+              channelContextId={
+                resolvedId.startsWith("UC") ? resolvedId : undefined
+              }
+            />
+          </div>
+          <DiscoverComingSoon />
+        </main>
+      </AppShell>
+    );
+  }
+
   const mockFallback = getVideosForChannel("c1");
 
   const rowsRaw = await Promise.all(

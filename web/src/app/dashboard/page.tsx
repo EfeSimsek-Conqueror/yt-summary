@@ -6,6 +6,7 @@ import { PlaylistGridView } from "@/components/playlist/playlist-grid-view";
 import { userHasGoogleIdentity } from "@/lib/auth/google-identity";
 import { getChannelsForUser } from "@/lib/channels-for-user";
 import { getChannel } from "@/lib/mock-data";
+import { isDiscoverEnabled } from "@/lib/discover-enabled";
 import { createClient } from "@/lib/supabase/server";
 import {
   getVideosForHome,
@@ -30,7 +31,15 @@ export default async function DashboardPage({ searchParams }: Props) {
     typeof channelParam === "string" ? channelParam.trim() : "";
 
   if (!channelId && !isSearch && !playlistId) {
-    redirect("/dashboard/discover");
+    if (isDiscoverEnabled()) {
+      redirect("/dashboard/discover");
+    }
+    const { channels: homeChannels } = await getChannelsForUser();
+    const first = homeChannels[0]?.id;
+    if (first) {
+      redirect(`/dashboard?channel=${encodeURIComponent(first)}`);
+    }
+    redirect("/dashboard?channel=c1");
   }
 
   const supabase = await createClient();

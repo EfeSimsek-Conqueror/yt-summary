@@ -1,11 +1,23 @@
+import Link from "next/link";
 import type {
   AnalysisContentKind,
   AnalysisPayload,
 } from "@/lib/types";
 
+function isInsufficientCreditsMessage(msg: string): boolean {
+  const s = msg.toLowerCase();
+  return (
+    s.includes("not enough credits") ||
+    s.includes("insufficient_credits") ||
+    s.includes("insufficient credits")
+  );
+}
+
 type Props = {
   canEmbed: boolean;
   analysis: AnalysisPayload | null;
+  /** When analysis failed (e.g. 402), show message and optional billing link. */
+  analysisError: string | null;
   preAnalysisHint: string;
   summaryPanelScrollable: boolean;
   spoilersRevealed: boolean;
@@ -24,6 +36,7 @@ type Props = {
 export function YoutubeSummaryTakeawaysPanel({
   canEmbed,
   analysis,
+  analysisError,
   preAnalysisHint,
   summaryPanelScrollable,
   spoilersRevealed,
@@ -53,7 +66,23 @@ export function YoutubeSummaryTakeawaysPanel({
       >
         {!analysis ? (
           <>
-            <p className="whitespace-pre-wrap text-muted">{preAnalysisHint}</p>
+            {analysisError ? (
+              <div className="space-y-3 rounded-lg border border-red-500/35 bg-red-950/25 px-3 py-2.5">
+                <p className="whitespace-pre-wrap text-sm text-red-100/95">
+                  {analysisError}
+                </p>
+                {isInsufficientCreditsMessage(analysisError) ? (
+                  <Link
+                    href="/settings/billing"
+                    className="inline-flex text-sm font-semibold text-accent underline decoration-accent/50 underline-offset-2 hover:decoration-accent"
+                  >
+                    Add credits or upgrade — Plan &amp; billing
+                  </Link>
+                ) : null}
+              </div>
+            ) : (
+              <p className="whitespace-pre-wrap text-muted">{preAnalysisHint}</p>
+            )}
             {!summaryPanelScrollable ? (
               <div
                 className="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-surface to-transparent"

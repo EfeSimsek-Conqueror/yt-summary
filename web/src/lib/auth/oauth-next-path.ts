@@ -1,27 +1,29 @@
+import { defaultDashboardAfterLogin } from "@/lib/discover-enabled";
+
 /**
  * Safe path-only redirect after OAuth (blocks open redirects, bad encodings).
- * Default: main app feed after login.
+ * Default: Discover when enabled, otherwise `/dashboard` (subscription feed).
  */
-const DEFAULT_AFTER_LOGIN = "/dashboard/discover";
-
 export function sanitizeOAuthNextPath(raw: string | null | undefined): string {
-  if (raw == null || raw === "") return DEFAULT_AFTER_LOGIN;
+  const fallback = defaultDashboardAfterLogin();
+  if (raw == null || raw === "") return fallback;
   let s = raw.trim();
   try {
     s = decodeURIComponent(s);
   } catch {
-    return DEFAULT_AFTER_LOGIN;
+    return fallback;
   }
   s = s.trim();
-  if (!s.startsWith("/")) return DEFAULT_AFTER_LOGIN;
-  if (s.startsWith("//")) return DEFAULT_AFTER_LOGIN;
-  if (s.includes("://")) return DEFAULT_AFTER_LOGIN;
-  if (s.length > 512) return DEFAULT_AFTER_LOGIN;
+  if (!s.startsWith("/")) return fallback;
+  if (s.startsWith("//")) return fallback;
+  if (s.includes("://")) return fallback;
+  if (s.length > 512) return fallback;
   return s;
 }
 
-/** Landing `/` after OAuth → open Discover (simple “logged-in home”). */
+/** Landing `/` after OAuth → Discover or dashboard home depending on feature flag. */
 export function postOAuthRedirectPath(safePath: string): string {
-  if (safePath === "/" || safePath === "") return DEFAULT_AFTER_LOGIN;
+  const fallback = defaultDashboardAfterLogin();
+  if (safePath === "/" || safePath === "") return fallback;
   return safePath;
 }

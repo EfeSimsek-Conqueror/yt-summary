@@ -288,7 +288,8 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
       : "The server loads timed captions when possible, then runs analysis. The text shown here before you run analysis is the video description, not subtitles."
     : video.transcriptPreview;
 
-  const summaryPanelScrollable = !canEmbed || Boolean(analysis);
+  const summaryPanelScrollable =
+    !canEmbed || Boolean(analysis) || Boolean(analysisError);
 
   const segmentTimes = segments.map((seg, idx) => ({
     idx,
@@ -993,6 +994,7 @@ export function YoutubeWatchLayout({ video, channelLabel }: Props) {
         <YoutubeSummaryTakeawaysPanel
           canEmbed={canEmbed}
           analysis={analysis}
+          analysisError={analysisError}
           preAnalysisHint={preAnalysisHint}
           summaryPanelScrollable={summaryPanelScrollable}
           spoilersRevealed={spoilersRevealed}
