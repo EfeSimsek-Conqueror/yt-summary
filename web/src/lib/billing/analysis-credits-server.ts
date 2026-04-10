@@ -1,16 +1,29 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { creditsForDurationSeconds } from "@/lib/billing/video-credits";
+import {
+  hasUnlimitedAnalysisCredits,
+  UNLIMITED_CREDITS_UI_VALUE,
+} from "@/lib/billing/unlimited-credits-allowlist";
 
 export async function checkCreditsForAnalysis(
   supabase: SupabaseClient,
   userId: string,
   billingDurationSec: number,
+  userEmail?: string | null,
 ): Promise<
-  | { ok: true; creditsBefore: number; cost: number }
+  | { ok: true; creditsBefore: number; cost: number; skipDeduction: boolean }
   | { ok: false; response: NextResponse }
 > {
   const cost = creditsForDurationSeconds(billingDurationSec);
+  if (hasUnlimitedAnalysisCredits(userEmail)) {
+    return {
+      ok: true,
+      creditsBefore: 0,
+      cost,
+      skipDeduction: true,
+    };
+  }
   const { data: ucRow } = await supabase
     .from("user_credits")
     .select("credits_remaining")
@@ -31,14 +44,22 @@ export async function checkCreditsForAnalysis(
       ),
     };
   }
-  return { ok: true, creditsBefore, cost };
+  return { ok: true, creditsBefore, cost, skipDeduction: false };
 }
 
 export async function deductCreditsAfterAnalysis(
   supabase: SupabaseClient,
   billingDurationSec: number,
   creditsBefore: number,
+  options?: { skipDeduction?: boolean },
 ): Promise<{ creditsRemaining: number; creditsCharged?: number }> {
+  if (options?.skipDeduction) {
+    return {
+      creditsRemaining: UNLIMITED_CREDITS_UI_VALUE,
+      creditsCharged: 0,
+    };
+  }
+
   const { data: deductRpc } = await supabase.rpc("deduct_analysis_credits", {
     p_duration_seconds: billingDurationSec,
   });

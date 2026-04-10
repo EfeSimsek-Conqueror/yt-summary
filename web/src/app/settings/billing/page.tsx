@@ -1,108 +1,11 @@
-import { Suspense, type ReactNode } from "react";
+import { Suspense } from "react";
 import { BillingPlanFocus } from "@/components/billing/billing-plan-focus";
-import { SignInForBillingButton } from "@/components/billing/sign-in-for-billing-button";
+import { BillingPricingCard } from "@/components/billing/billing-pricing-card";
 import { BillingStripeActions } from "@/components/billing-stripe-actions";
-import { StripeSubscribeButton } from "@/components/stripe-subscribe-button";
 import { getBillingSnapshot, subscriptionStatusLabel } from "@/lib/billing/settings-billing-snapshot";
-import {
-  formatPlanPrice,
-  PLANS,
-  PLAN_ORDER,
-  type PlanDefinition,
-} from "@/lib/billing/plans";
+import { formatPlanPrice, PLANS, PLAN_ORDER } from "@/lib/billing/plans";
 import { formatCreditsDisplay } from "@/lib/billing/video-credits";
 import { createClient } from "@/lib/supabase/server";
-import { CheckCircle2, Crown, Sparkles, Star } from "lucide-react";
-
-function PlanCard({
-  plan,
-  isCurrent,
-  isPopular,
-  footerSlot,
-}: {
-  plan: PlanDefinition;
-  isCurrent: boolean;
-  isPopular: boolean;
-  footerSlot?: ReactNode;
-}) {
-  const borderClass = isCurrent
-    ? "border-purple-500/60 ring-1 ring-purple-500/30"
-    : plan.id === "captain"
-      ? "border-amber-500/30"
-      : "border-gray-700/50";
-
-  const bgClass = isCurrent
-    ? "bg-gradient-to-b from-purple-900/30 to-gray-950/80"
-    : plan.id === "captain"
-      ? "bg-gradient-to-b from-amber-900/15 to-gray-950/80"
-      : "bg-gradient-to-b from-gray-800/30 to-gray-950/80";
-
-  return (
-    <div
-      className={`relative flex flex-col rounded-2xl border p-5 ${borderClass} ${bgClass}`}
-    >
-      {isPopular ? (
-        <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-purple-500 px-3 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-lg shadow-purple-500/30">
-          Popular
-        </span>
-      ) : null}
-      {isCurrent ? (
-        <span className="absolute -top-3 right-4 rounded-full bg-emerald-500 px-3 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white shadow">
-          Current
-        </span>
-      ) : null}
-
-      <div className="mb-4 flex items-center gap-2">
-        {plan.id === "scout" ? (
-          <Star className="h-5 w-5 text-gray-400" />
-        ) : plan.id === "navigator" ? (
-          <Sparkles className="h-5 w-5 text-purple-400" />
-        ) : (
-          <Crown className="h-5 w-5 text-amber-400" />
-        )}
-        <h3 className="text-lg font-bold text-white">{plan.shortName}</h3>
-      </div>
-
-      <p className="text-3xl font-bold text-white">
-        {plan.priceLabel}
-        <span className="text-sm font-normal text-gray-400">
-          {plan.priceSubtext}
-        </span>
-      </p>
-
-      <p className="mt-3 text-sm text-gray-300">
-        {plan.creditsIncluded} credits
-        {plan.creditsPeriod === "month" ? " / month" : " (one-time)"}
-      </p>
-
-      <ul className="mt-4 flex-1 space-y-2 text-sm text-gray-400">
-        <li className="flex items-start gap-2">
-          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
-          AI summaries &amp; segments
-        </li>
-        <li className="flex items-start gap-2">
-          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
-          Video chat assistant
-        </li>
-        {plan.id !== "scout" ? (
-          <li className="flex items-start gap-2">
-            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
-            Playlist background analysis
-          </li>
-        ) : null}
-        {plan.id === "captain" ? (
-          <li className="flex items-start gap-2">
-            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
-            Priority analysis queue
-          </li>
-        ) : null}
-      </ul>
-      {footerSlot ? (
-        <div className="mt-5 border-t border-gray-700/50 pt-4">{footerSlot}</div>
-      ) : null}
-    </div>
-  );
-}
 
 type BillingPageProps = {
   searchParams: Promise<{ checkout?: string; plan?: string }>;
@@ -118,7 +21,11 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const snapshot = await getBillingSnapshot(supabase, user?.id ?? null);
+  const snapshot = await getBillingSnapshot(
+    supabase,
+    user?.id ?? null,
+    user?.email ?? null,
+  );
   const currentPlan = PLANS[snapshot.effectivePlanId];
   const creditsDetail =
     currentPlan.creditsPeriod === "once"
@@ -174,31 +81,18 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
         </p>
       ) : null}
 
-      {/* Plan comparison cards */}
+      {/* Plan comparison cards — paid tiers are clickable → Stripe checkout or sign-in */}
       <div className="grid gap-4 sm:grid-cols-3">
         {PLAN_ORDER.map((id) => {
           const tier = PLANS[id];
-          const showSubscribe =
-            snapshot.stripeConfigured &&
-            id !== "scout" &&
-            id !== snapshot.effectivePlanId;
-          let footer: ReactNode;
-          if (showSubscribe) {
-            footer = user ? (
-              <StripeSubscribeButton
-                tier={id === "navigator" ? "navigator" : "captain"}
-              />
-            ) : (
-              <SignInForBillingButton returnTo={`/settings/billing?plan=${id}`} />
-            );
-          }
           return (
-            <PlanCard
+            <BillingPricingCard
               key={id}
               plan={tier}
               isCurrent={id === snapshot.effectivePlanId}
               isPopular={tier.popular === true}
-              footerSlot={footer}
+              stripeConfigured={snapshot.stripeConfigured}
+              isSignedIn={Boolean(user)}
             />
           );
         })}

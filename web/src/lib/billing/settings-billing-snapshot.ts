@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PLANS, type PlanId } from "@/lib/billing/plans";
 import { effectivePlanIdFromSubscriptionRow } from "@/lib/billing/resolve-plan";
+import {
+  hasUnlimitedAnalysisCredits,
+  UNLIMITED_CREDITS_UI_VALUE,
+} from "@/lib/billing/unlimited-credits-allowlist";
 
 export type BillingSnapshot = {
   creditsRemaining: number;
@@ -15,6 +19,7 @@ export type BillingSnapshot = {
 export async function getBillingSnapshot(
   supabase: SupabaseClient,
   userId: string | null,
+  userEmail?: string | null,
 ): Promise<BillingSnapshot> {
   const stripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY?.trim());
 
@@ -57,6 +62,10 @@ export async function getBillingSnapshot(
     .select("stripe_customer_id")
     .eq("user_id", userId)
     .maybeSingle();
+
+  if (hasUnlimitedAnalysisCredits(userEmail)) {
+    creditsRemaining = UNLIMITED_CREDITS_UI_VALUE;
+  }
 
   return {
     creditsRemaining,

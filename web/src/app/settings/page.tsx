@@ -21,7 +21,11 @@ export default async function SettingsPage() {
   const name =
     (user?.user_metadata?.full_name as string | undefined)?.trim() || null;
 
-  const snapshot = await getBillingSnapshot(supabase, user?.id ?? null);
+  const snapshot = await getBillingSnapshot(
+    supabase,
+    user?.id ?? null,
+    user?.email ?? null,
+  );
   const plan = PLANS[snapshot.effectivePlanId];
   const creditsDetail =
     plan.creditsPeriod === "once"

@@ -255,11 +255,12 @@ export async function POST(request: NextRequest) {
       supabase,
       user.id,
       billingDurationSec,
+      user.email,
     );
     if (!creditCheck.ok) {
       return creditCheck.response;
     }
-    const { creditsBefore } = creditCheck;
+    const { creditsBefore, skipDeduction } = creditCheck;
 
     const analysis = await analyzeTranscriptWithGeminiFlash({
       transcript: forModel,
@@ -269,11 +270,9 @@ export async function POST(request: NextRequest) {
     });
 
     const { creditsRemaining, creditsCharged } =
-      await deductCreditsAfterAnalysis(
-        supabase,
-        billingDurationSec,
-        creditsBefore,
-      );
+      await deductCreditsAfterAnalysis(supabase, billingDurationSec, creditsBefore, {
+        skipDeduction,
+      });
 
     await supabase.from("video_analyses").upsert(
       {

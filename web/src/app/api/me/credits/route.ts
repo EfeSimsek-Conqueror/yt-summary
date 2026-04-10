@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { PLANS } from "@/lib/billing/plans";
 import { effectivePlanIdFromSubscriptionRow } from "@/lib/billing/resolve-plan";
+import {
+  hasUnlimitedAnalysisCredits,
+  UNLIMITED_CREDITS_UI_VALUE,
+} from "@/lib/billing/unlimited-credits-allowlist";
 
 export const runtime = "nodejs";
 
@@ -24,8 +28,11 @@ export async function GET() {
     .eq("user_id", user.id)
     .maybeSingle();
 
-  const creditsRemaining =
+  let creditsRemaining =
     row != null ? Number(row.credits_remaining) : PLANS.scout.creditsIncluded;
+  if (hasUnlimitedAnalysisCredits(user.email)) {
+    creditsRemaining = UNLIMITED_CREDITS_UI_VALUE;
+  }
 
   const { data: subRow } = await supabase
     .from("billing_subscriptions")
